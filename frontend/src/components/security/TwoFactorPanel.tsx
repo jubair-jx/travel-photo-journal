@@ -102,8 +102,10 @@ export function TwoFactorPanel() {
   return (
     <Card className="max-w-xl space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Two-factor authentication</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <h1 className="font-display text-3xl font-semibold text-white">
+          Two-factor authentication
+        </h1>
+        <p className="mt-1 text-sm text-slate-300">
           Add a second step to signing in, using a code from an authenticator app.
         </p>
       </div>
@@ -118,7 +120,7 @@ export function TwoFactorPanel() {
 
       {stage === "scan" && details && (
         <div className="space-y-5">
-          <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-200">
             <li>Open an authenticator app (such as Google Authenticator or 1Password).</li>
             <li>Scan this QR code, or enter the key by hand.</li>
             <li>Type the 6-digit code the app shows to confirm.</li>
@@ -130,11 +132,11 @@ export function TwoFactorPanel() {
               alt="QR code for your authenticator app"
               width={176}
               height={176}
-              className="size-44 rounded-lg ring-1 ring-slate-200"
+              className="size-44 rounded-lg ring-1 ring-white/15"
             />
             <div className="min-w-0 space-y-2">
-              <p className="text-sm font-medium text-slate-700">Can&apos;t scan? Enter this key:</p>
-              <code className="block rounded-lg bg-slate-100 px-3 py-2 text-sm break-all text-slate-800">
+              <p className="text-sm font-medium text-slate-200">Can&apos;t scan? Enter this key:</p>
+              <code className="block rounded-lg bg-white/10 px-3 py-2 text-sm break-all text-slate-100">
                 {details.manualKey}
               </code>
               <Button variant="secondary" onClick={copyKey}>

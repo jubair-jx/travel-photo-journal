@@ -100,7 +100,7 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
         {...register("description")}
       />
       <div>
-        <label htmlFor="photo-image" className="mb-1 block text-sm font-medium text-slate-700">
+        <label htmlFor="photo-image" className="mb-1 block text-sm font-medium text-slate-200">
           Image
         </label>
         {shownImage && (
@@ -122,16 +122,16 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
             setFile(chosen);
             setImageError(validateImage(chosen, !editing));
           }}
-          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+          className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-200 hover:file:bg-white/20"
         />
         {editing && !imageError && (
-          <p className="mt-1 text-xs text-slate-500">Leave empty to keep the current image.</p>
+          <p className="mt-1 text-xs text-slate-400">Leave empty to keep the current image.</p>
         )}
         {!editing && !imageError && (
-          <p className="mt-1 text-xs text-slate-500">JPEG, PNG or WebP, up to 5 MB.</p>
+          <p className="mt-1 text-xs text-slate-400">JPEG, PNG or WebP, up to 5 MB.</p>
         )}
         {imageError && (
-          <p id="photo-image-error" role="alert" className="mt-1 text-sm text-red-600">
+          <p id="photo-image-error" role="alert" className="mt-1 text-sm text-red-400">
             {imageError}
           </p>
         )}

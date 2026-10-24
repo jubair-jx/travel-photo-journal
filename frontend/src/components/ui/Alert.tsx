@@ -4,9 +4,9 @@ import { cn } from "@/lib/cn";
 type Tone = "error" | "success" | "info";
 
 const TONES: Record<Tone, string> = {
-  error: "bg-red-50 text-red-800 ring-red-200",
-  success: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  info: "bg-indigo-50 text-indigo-800 ring-indigo-200",
+  error: "bg-red-500/10 text-red-200 ring-red-400/30",
+  success: "bg-emerald-500/10 text-emerald-200 ring-emerald-400/30",
+  info: "bg-sky-500/10 text-sky-200 ring-sky-400/30",
 };
 
 export function Alert({
@@ -21,7 +21,7 @@ export function Alert({
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      className={cn("rounded-lg px-4 py-3 text-sm ring-1 ring-inset", TONES[tone], className)}
+      className={cn("rounded-xl px-4 py-3 text-sm ring-1 ring-inset", TONES[tone], className)}
     >
       {children}
     </div>

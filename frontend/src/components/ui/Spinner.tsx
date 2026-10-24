@@ -31,7 +31,7 @@ export function Spinner({ className, label = "Loading" }: { className?: string; 
 
 export function FullPageSpinner() {
   return (
-    <div className="flex min-h-[60vh] items-center justify-center text-indigo-600">
+    <div className="flex min-h-[60vh] items-center justify-center text-orange-400">
       <Spinner className="size-8" label="Loading your session" />
     </div>
   );

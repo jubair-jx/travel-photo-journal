@@ -2,7 +2,7 @@ import { useId, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 const CONTROL =
-  "block w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs ring-1 ring-inset placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:outline-none";
+  "block w-full rounded-xl border-0 bg-white/6 px-3.5 py-2.5 text-sm text-white ring-1 ring-inset placeholder:text-slate-500 focus:ring-2 focus:ring-inset focus:outline-none";
 
 interface FieldShellProps {
   label: string;
@@ -15,13 +15,13 @@ interface FieldShellProps {
 function FieldShell({ label, error, hint, id, children }: FieldShellProps) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-300">
         {label}
       </label>
       {children}
-      {hint && !error && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && !error && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
       {error && (
-        <p id={`${id}-error`} role="alert" className="mt-1 text-sm text-red-600">
+        <p id={`${id}-error`} role="alert" className="mt-1 text-sm text-red-400">
           {error}
         </p>
       )}
@@ -45,7 +45,7 @@ export function TextField({ label, error, hint, className, ...props }: TextField
         aria-describedby={error ? `${id}-error` : undefined}
         className={cn(
           CONTROL,
-          error ? "ring-red-400 focus:ring-red-500" : "ring-slate-300 focus:ring-indigo-600",
+          error ? "ring-red-400/60 focus:ring-red-400" : "ring-white/15 focus:ring-orange-400",
           className,
         )}
         {...props}
@@ -70,7 +70,7 @@ export function TextAreaField({ label, error, hint, className, ...props }: TextA
         aria-describedby={error ? `${id}-error` : undefined}
         className={cn(
           CONTROL,
-          error ? "ring-red-400 focus:ring-red-500" : "ring-slate-300 focus:ring-indigo-600",
+          error ? "ring-red-400/60 focus:ring-red-400" : "ring-white/15 focus:ring-orange-400",
           className,
         )}
         {...props}

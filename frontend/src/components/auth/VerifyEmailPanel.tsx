@@ -35,7 +35,7 @@ export function VerifyEmailPanel() {
 
   if (isUninitialized || (!isSuccess && !isError)) {
     return (
-      <div className="flex items-center gap-3 text-slate-600">
+      <div className="flex items-center gap-3 text-slate-300">
         <Spinner />
         <span>Verifying your email…</span>
       </div>
@@ -48,7 +48,7 @@ export function VerifyEmailPanel() {
         <Alert tone="success">Your email is verified. You can sign in now.</Alert>
         <Link
           href="/login"
-          className="inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          className="inline-flex rounded-xl bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-orange-500/20 transition hover:brightness-110"
         >
           Go to sign in
         </Link>
@@ -59,7 +59,7 @@ export function VerifyEmailPanel() {
   return (
     <div className="space-y-4">
       <Alert>{errorMessage(error)}</Alert>
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-slate-300">
         Links work once and expire after 24 hours. Get a fresh one:
       </p>
       <ResendVerification />
