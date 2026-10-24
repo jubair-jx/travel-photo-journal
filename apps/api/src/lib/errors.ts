@@ -48,3 +48,9 @@ export const twoFactorNotSetUp = (): AppError =>
 
 export const invalidTotpCode = (): AppError =>
   new AppError(400, "INVALID_TOTP_CODE", "That code is not valid");
+
+export const payloadTooLarge = (message = "Request body is too large"): AppError =>
+  new AppError(413, "PAYLOAD_TOO_LARGE", message);
+
+export const unsupportedMediaType = (message: string): AppError =>
+  new AppError(415, "UNSUPPORTED_MEDIA_TYPE", message);

@@ -4,13 +4,22 @@ import { ConfigError, loadConfig } from "./config/env.js";
 import { createLogger } from "./lib/logger.js";
 import { createSmtpMailer } from "./lib/mailer.js";
 import { createPrismaClient } from "./lib/prisma.js";
+import { createStorage } from "./lib/storage.factory.js";
+import { createSummarizer } from "./lib/summarizer.js";
 
 function main(): void {
   const config = loadConfig(process.env);
   const logger = createLogger(config.logLevel);
   const prisma = createPrismaClient(config.databaseUrl);
   const mailer = createSmtpMailer(config.mail);
-  const server = createApp({ config, logger, prisma, mailer }).listen(config.port, () => {
+  const server = createApp({
+    config,
+    logger,
+    prisma,
+    mailer,
+    storage: createStorage(config),
+    summarizer: createSummarizer(config.summary),
+  }).listen(config.port, () => {
     logger.info({ port: config.port, env: config.nodeEnv }, "api listening");
   });
 

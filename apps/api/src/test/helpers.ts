@@ -6,6 +6,8 @@ import type { PrismaClient } from "../lib/prisma.js";
 import type { AuthRateLimits } from "../modules/auth/auth.routes.js";
 import { createTestPrisma, testDatabaseUrl } from "./db.js";
 import { FakeMailer } from "./fake-mailer.js";
+import { FakeStorage } from "./fake-storage.js";
+import { FakeSummarizer } from "./fake-summarizer.js";
 
 export const testConfig: Config = {
   nodeEnv: "test",
@@ -21,6 +23,13 @@ export const testConfig: Config = {
   },
   refreshCookiePath: "/",
   totpEncryptionKey: Buffer.alloc(32, 9),
+  storage: {
+    driver: "local",
+    directory: "./uploads",
+    publicBaseUrl: "http://localhost:4000",
+    urlTtlSeconds: 900,
+  },
+  summary: { models: [], baseUrl: "http://localhost:0", deadlineMs: 8000 },
   mail: { from: "Journal <no-reply@test.local>", smtp: { host: "localhost", port: 1025 } },
 };
 
@@ -38,6 +47,8 @@ export interface TestContext {
   app: Express;
   prisma: PrismaClient;
   mailer: FakeMailer;
+  storage: FakeStorage;
+  summarizer: FakeSummarizer;
 }
 
 export interface TestContextOptions {
@@ -49,14 +60,18 @@ export interface TestContextOptions {
 export function buildTestContext(options: TestContextOptions = {}): TestContext {
   const prisma = createTestPrisma();
   const mailer = new FakeMailer();
+  const storage = new FakeStorage();
+  const summarizer = new FakeSummarizer();
   const app = createApp({
     config: { ...testConfig, ...options.config },
     logger: options.logger ?? pino({ level: "silent" }),
     prisma,
     mailer,
+    storage,
+    summarizer,
     authRateLimits: { ...generousLimits, ...options.authRateLimits },
   });
-  return { app, prisma, mailer };
+  return { app, prisma, mailer, storage, summarizer };
 }
 
 export function buildTestApp(overrides: Partial<Config> = {}): Express {
