@@ -4,6 +4,7 @@ import { ConfigError, loadConfig } from "./env.js";
 const required = {
   APP_URL: "http://localhost:3000",
   DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
+  JWT_SECRET: "a-secret-that-is-comfortably-over-32-chars",
 };
 
 describe("loadConfig", () => {
@@ -17,6 +18,12 @@ describe("loadConfig", () => {
       logLevel: "info",
       trustProxy: 0,
       databaseUrl: required.DATABASE_URL,
+      jwt: {
+        secret: required.JWT_SECRET,
+        issuer: "travel-photo-journal",
+        audience: "travel-photo-journal-web",
+      },
+      refreshCookiePath: "/",
       mail: {
         from: "Travel Photo Journal <no-reply@localhost>",
         smtp: { host: "localhost", port: 1025 },
@@ -36,9 +43,14 @@ describe("loadConfig", () => {
       SMTP_USER: "mailer",
       SMTP_PASS: "mail-pass",
       MAIL_FROM: "Journal <hello@example.com>",
+      JWT_ISSUER: "my-issuer",
+      JWT_AUDIENCE: "my-audience",
+      REFRESH_COOKIE_PATH: "/api/auth",
     });
 
     expect(config).toMatchObject({
+      jwt: { issuer: "my-issuer", audience: "my-audience" },
+      refreshCookiePath: "/api/auth",
       nodeEnv: "production",
       port: 8080,
       logLevel: "warn",
@@ -62,6 +74,13 @@ describe("loadConfig", () => {
       expect(message).toContain("APP_URL");
       expect(message).not.toContain("s3cr3t");
     }
+  });
+
+  it("rejects a short JWT secret without echoing it", () => {
+    const attempt = () => loadConfig({ ...required, JWT_SECRET: "too-short-s3cr3t" });
+
+    expect(attempt).toThrow(/JWT_SECRET/);
+    expect(attempt).not.toThrow(/s3cr3t/);
   });
 
   it("requires APP_URL and DATABASE_URL", () => {
