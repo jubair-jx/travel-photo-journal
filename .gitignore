@@ -28,4 +28,4 @@ docs/agents/
 next-env.d.ts
 
 # prisma client output
-apps/api/src/generated/
+backend/src/generated/

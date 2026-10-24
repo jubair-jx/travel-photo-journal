@@ -19,19 +19,19 @@ Compose starts Postgres, runs the migrations in a one-shot `migrate` service, an
 
 Without `OPENROUTER_API_KEY` summaries are switched off and photos simply have no summary.
 
-## Option B: run the apps on your machine
+## Option B: run the backend and frontend on your machine
 
 ```bash
 docker compose up -d postgres mailpit
 npm ci
-cp apps/api/.env.example apps/api/.env      # fill in the values; see the table below
-npm run dev:api                              # http://localhost:4000
-npm run dev:web                              # http://localhost:3000
+cp backend/.env.example backend/.env      # fill in the values; see the table below
+npm run dev:backend                              # http://localhost:4000
+npm run dev:frontend                              # http://localhost:3000
 ```
 
-For image links to work in the browser, set `API_PUBLIC_URL=http://localhost:3000/api` in `apps/api/.env` so they go through the web app's proxy.
+For image links to work in the browser, set `API_PUBLIC_URL=http://localhost:3000/api` in `backend/.env` so they go through the web app's proxy.
 
-Create migrations with `DIRECT_URL=postgresql://tpj:tpj@localhost:5432/tpj_dev npx prisma migrate dev --name <change>` from `apps/api`.
+Create migrations with `DIRECT_URL=postgresql://tpj:tpj@localhost:5432/tpj_dev npx prisma migrate dev --name <change>` from `backend`.
 
 ## Tests
 
@@ -76,6 +76,6 @@ Web: `API_INTERNAL_URL` (default `http://localhost:4000`) is where the Next.js s
 - **Tests crash with `TypeError: code.charCodeAt is not a function`.** This is a Vitest error-printing bug that hides the real cause, almost always the test database being unreachable. Run `docker compose up -d postgres` and retry.
 - **`docker compose up` says a variable is missing.** Create the root `.env` from `.env.example` and fill in the two secrets.
 - **The migrate service fails.** `docker compose logs migrate` shows why; typically Postgres was not ready or the volume holds a database from an older schema (`docker compose down -v` resets it).
-- **Typecheck or lint reports errors about `generated/prisma`.** Run `npm run prisma:generate -w apps/api`; the Prisma client is generated, not committed.
+- **Typecheck or lint reports errors about `generated/prisma`.** Run `npm run prisma:generate -w backend`; the Prisma client is generated, not committed.
 - **Images do not load in the browser (local driver).** `API_PUBLIC_URL` must be an address the browser can reach: `http://localhost:3000/api` when going through the web app.
 - **A browser console shows a 401 on public pages.** Expected: the first silent refresh finds no session cookie yet.

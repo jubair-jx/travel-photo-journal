@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   ...(standalone && {
     output: "standalone" as const,
     // In a monorepo, dependencies live at the repository root; tracing must start there.
-    outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
+    outputFileTracingRoot: fileURLToPath(new URL("../", import.meta.url)),
   }),
   turbopack: {
     rules: {

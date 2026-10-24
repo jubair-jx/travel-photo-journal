@@ -64,13 +64,14 @@ flowchart LR
 ```
 
 ```
-apps/
-  api/   Express API: src/config, lib, middleware, modules/{auth,photos}, prisma/
-  web/   Next.js app: app/, components/, store/ (RTK Query), lib/
-docs/    PRD, glossary, architecture, database, API reference, security, deployment, ADRs
+backend/    Express API: src/config, lib, middleware, modules/{auth,photos}, prisma/
+frontend/   Next.js app: app/, components/, store/ (RTK Query), lib/
+docs/       backend/, frontend/, devops/, plus PRD, glossary, architecture and ADRs
+.github/    CI workflow
+.husky/     git hooks (pre-commit, commit-msg)
 ```
 
-Details: [architecture](docs/architecture.md), [database](docs/database.md).
+Details: [architecture](docs/architecture.md), [database](docs/backend/database.md).
 
 ## Getting started
 
@@ -85,17 +86,17 @@ docker compose up --build
 
 Open <http://localhost:3000>. Emails sent by the app (such as the verification link) appear at <http://localhost:8025>.
 
-**Run the apps on your machine:**
+**Run the backend and frontend on your machine:**
 
 ```bash
 docker compose up -d postgres mailpit
 npm ci
-cp apps/api/.env.example apps/api/.env     # fill in the values
-npm run dev:api                             # http://localhost:4000
-npm run dev:web                             # http://localhost:3000
+cp backend/.env.example backend/.env     # fill in the values
+npm run dev:backend                             # http://localhost:4000
+npm run dev:frontend                             # http://localhost:3000
 ```
 
-More, including troubleshooting: [docs/development.md](docs/development.md).
+More, including troubleshooting: [docs/devops/development.md](docs/devops/development.md).
 
 ### Environment variables (API)
 
@@ -116,24 +117,24 @@ Empty values count as unset. Only the first four are required; the rest have def
 | `SIGNED_URL_TTL_SECONDS`                                                 | Lifetime of image links (default 900)                                             |
 | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_FALLBACK_MODELS`   | Summary generation; without a key and model, summaries are off                    |
 
-The web app reads `API_INTERNAL_URL` (where `/api/*` is forwarded) when it is built. Defaults and the complete list are in [docs/development.md](docs/development.md).
+The web app reads `API_INTERNAL_URL` (where `/api/*` is forwarded) when it is built. Defaults and the complete list are in [docs/devops/development.md](docs/devops/development.md).
 
 ### Scripts
 
-| Command                                   | What it does                                                |
-| ----------------------------------------- | ----------------------------------------------------------- |
-| `npm run dev:api` / `npm run dev:web`     | Start a dev server                                          |
-| `npm test`                                | API tests (need Postgres) and web tests                     |
-| `npm run lint`                            | ESLint (strict, type-aware) for both apps                   |
-| `npm run typecheck`                       | TypeScript, no emit                                         |
-| `npm run format` / `npm run format:check` | Prettier                                                    |
-| `npm run build`                           | Build both apps                                             |
-| `npm run prisma:generate -w apps/api`     | Generate the Prisma client (also run before test and build) |
-| `npm run prisma:deploy -w apps/api`       | Apply pending migrations                                    |
+| Command                                        | What it does                                                |
+| ---------------------------------------------- | ----------------------------------------------------------- |
+| `npm run dev:backend` / `npm run dev:frontend` | Start a dev server                                          |
+| `npm test`                                     | API tests (need Postgres) and web tests                     |
+| `npm run lint`                                 | ESLint (strict, type-aware) for backend and frontend        |
+| `npm run typecheck`                            | TypeScript, no emit                                         |
+| `npm run format` / `npm run format:check`      | Prettier                                                    |
+| `npm run build`                                | Build backend and frontend                                  |
+| `npm run prisma:generate -w backend`           | Generate the Prisma client (also run before test and build) |
+| `npm run prisma:deploy -w backend`             | Apply pending migrations                                    |
 
 ## API
 
-Responses always use one of two shapes: `{ "success": true, "data": ... }` or `{ "success": false, "error": { "code", "message", "details?" } }`. The full reference, with request bodies, responses and every error code, is in [docs/api.md](docs/api.md).
+Responses always use one of two shapes: `{ "success": true, "data": ... }` or `{ "success": false, "error": { "code", "message", "details?" } }`. The full reference, with request bodies, responses and every error code, is in [docs/backend/api.md](docs/backend/api.md).
 
 | Method and path                  | Purpose                                                     | Auth   |
 | -------------------------------- | ----------------------------------------------------------- | ------ |
@@ -154,7 +155,7 @@ Responses always use one of two shapes: `{ "success": true, "data": ... }` or `{
 
 ## Security decisions
 
-The complete list, with status, is in [docs/security.md](docs/security.md). The main points:
+The complete list, with status, is in [docs/backend/security.md](docs/backend/security.md). The main points:
 
 - **Passwords** are hashed with argon2id; logins give the same error and take about the same time for an unknown email and a wrong password.
 - **Tokens are never stored in the clear.** Verification and refresh tokens are 256-bit random values stored as SHA-256 hashes; verification links are single-use and expire after 24 hours; refresh tokens rotate on every use, and replaying an old one revokes the whole session.
@@ -179,7 +180,7 @@ npm test
 
 ## Docker
 
-`docker compose up --build` runs Postgres, Mailpit, a one-shot migration service, the API and the web app, with health checks and start-up ordering. The images are multi-stage and run as a non-root user. See [docs/development.md](docs/development.md) and [docs/deployment.md](docs/deployment.md).
+`docker compose up --build` runs Postgres, Mailpit, a one-shot migration service, the API and the web app, with health checks and start-up ordering. The images are multi-stage and run as a non-root user. See [docs/devops/development.md](docs/devops/development.md) and [docs/devops/deployment.md](docs/devops/deployment.md).
 
 ## Design decisions
 

@@ -41,7 +41,7 @@ jobs:
           cache: npm
       - run: npm ci
       # Lint and typecheck need the generated Prisma client, which is not committed.
-      - run: npm run prisma:generate -w apps/api
+      - run: npm run prisma:generate -w backend
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
@@ -61,7 +61,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: apps/api/Dockerfile
+          file: backend/Dockerfile
           push: false
           cache-from: type=gha,scope=api
           cache-to: type=gha,scope=api,mode=max
@@ -69,7 +69,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: apps/web/Dockerfile
+          file: frontend/Dockerfile
           build-args: API_INTERNAL_URL=http://api:4000
           push: false
           cache-from: type=gha,scope=web

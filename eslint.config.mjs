@@ -9,7 +9,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       "**/coverage/**",
-      "apps/web/**",
+      "frontend/**",
       "**/src/generated/**",
     ],
   },

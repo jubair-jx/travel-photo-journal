@@ -2,7 +2,7 @@
 
 ## Shape
 
-An npm-workspaces monorepo: `apps/api` (Express, TypeScript, Prisma) and `apps/web` (Next.js). The web app proxies `/api/*` to the API so that the refresh cookie is same-origin (ADR-0004).
+An npm-workspaces monorepo: `backend` (Express, TypeScript, Prisma) and `frontend` (Next.js). The web app proxies `/api/*` to the API so that the refresh cookie is same-origin (ADR-0004).
 
 ## API composition
 
@@ -51,7 +51,7 @@ Each module owns its HTTP surface and business logic:
 
 ## Data and mail
 
-Prisma is the only database access (pooled URL at runtime, direct URL for migrations; see database.md). Outbound email goes through the `Mailer` interface; the SMTP implementation targets Mailpit locally and Brevo in production, and tests substitute a recording fake.
+Prisma is the only database access (pooled URL at runtime, direct URL for migrations; see backend/database.md). Outbound email goes through the `Mailer` interface; the SMTP implementation targets Mailpit locally and Brevo in production, and tests substitute a recording fake.
 
 `photos` provides create, list, read, update and delete for a user's own photos; its service takes the storage and summarizer interfaces as dependencies.
 
@@ -63,15 +63,7 @@ The upload pipeline is: multer (memory, 5 MB, one file), then a magic-byte check
 
 ## Web application
 
-Next.js (App Router) with Tailwind utility classes only. Every page is a thin server component that renders client components, because all data comes from the authenticated API.
-
-- **Proxy:** `rewrites` forward `/api/*` to the API (`API_INTERNAL_URL`), so the browser sees one origin and the refresh cookie is same-origin.
-- **Data layer:** Redux Toolkit with RTK Query. One base query attaches the in-memory access token, unwraps the response envelope, normalizes errors, and performs a single-flight silent refresh on 401 (ADR-0011). The session is restored after a page load with the same refresh call.
-- **Persistence:** redux-persist stores only the "remember my email" preference. The auth slice and API cache are never persisted.
-- **Structure:** `app/` holds routes in two groups, `(auth)` for signed-out pages and `(app)` for signed-in pages behind a shell that waits for the session state; `components/` holds UI primitives and feature components; `store/` the data layer; `lib/` schemas, error helpers and types.
-- **Forms:** react-hook-form with zod schemas mirroring the API's rules; the API's field errors are mapped back onto the matching fields.
-- **States:** every page has loading, empty and error states; toasts report action outcomes; motion is limited to list items and dialogs and respects reduced-motion.
-- **Local development:** with `STORAGE_DRIVER=local`, set the API's `API_PUBLIC_URL` to `http://localhost:3000/api` so image links go through the proxy.
+See [frontend/architecture.md](frontend/architecture.md).
 
 ## Testing approach
 
