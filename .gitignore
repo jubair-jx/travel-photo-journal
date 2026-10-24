@@ -19,12 +19,9 @@ Thumbs.db
 .idea/
 .vscode/
 
-# private tooling and study notes
+# local tooling
 .claude/
-CLAUDE.md
 AGENTS.md
-docs/learn/
-docs/agents/
 next-env.d.ts
 
 # prisma client output

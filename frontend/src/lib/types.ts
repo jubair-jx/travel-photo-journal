@@ -29,6 +29,14 @@ export interface PhotoPage {
   totalPages: number;
 }
 
+export interface SessionInfo {
+  id: string;
+  userAgent: string | null;
+  startedAt: string;
+  lastActiveAt: string;
+  current: boolean;
+}
+
 export interface TwoFactorSetup {
   qrCodeDataUrl: string;
   manualKey: string;

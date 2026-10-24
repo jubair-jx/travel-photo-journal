@@ -39,14 +39,18 @@ model EmailVerificationToken {
 }
 
 model RefreshToken {
-  id           String    @id @default(uuid()) @db.Uuid
-  userId       String    @map("user_id") @db.Uuid
-  tokenHash    String    @unique @map("token_hash")
-  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
-  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  tokenHash        String    @unique @map("token_hash")
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
   // The token issued when this one was rotated; following these links walks a session forward.
-  replacedById String?   @map("replaced_by_id") @db.Uuid
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  replacedById     String?   @map("replaced_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Carried from token to token as a session rotates, so a session keeps one identity to show and revoke.
+  sessionId        String    @default(dbgenerated("gen_random_uuid()")) @map("session_id") @db.Uuid
+  userAgent        String?   @map("user_agent")
+  sessionStartedAt DateTime  @default(now()) @map("session_started_at") @db.Timestamptz(3)
 
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   replacedBy   RefreshToken?  @relation("Rotation", fields: [replacedById], references: [id], onDelete: SetNull)
@@ -54,6 +58,7 @@ model RefreshToken {
 
   @@index([userId])
   @@index([replacedById])
+  @@index([userId, sessionId])
   @@map("refresh_tokens")
 }
 
