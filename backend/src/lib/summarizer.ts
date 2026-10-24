@@ -1,3 +1,4 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
 export interface Summarizer {
@@ -87,6 +88,55 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : "request failed";
 }
 
+export interface AnthropicOptions {
+  apiKey: string;
+  model: string;
+  // Total time for the request. There are no retries: a failed summary just means no summary.
+  deadlineMs: number;
+  // Injected in tests; production builds the real client.
+  client?: Pick<Anthropic, "messages">;
+}
+
+// Below this a description is already as short as any summary would be, so the call is skipped.
+const MIN_SUMMARY_INPUT = 80;
+
+// Cost notes: the cheapest model, thinking off and effort low (reasoning tokens bill as output),
+// a short prompt, a small max_tokens, and no retries. A summary costs a fraction of a cent.
+export class AnthropicSummarizer implements Summarizer {
+  private readonly client: Pick<Anthropic, "messages">;
+
+  constructor(private readonly options: AnthropicOptions) {
+    this.client =
+      options.client ??
+      new Anthropic({ apiKey: options.apiKey, maxRetries: 0, timeout: options.deadlineMs });
+  }
+
+  async summarize(text: string): Promise<string | null> {
+    if (text.trim().length < MIN_SUMMARY_INPUT) return null;
+
+    try {
+      const message = await this.client.messages.create({
+        model: this.options.model,
+        max_tokens: 100,
+        system: SYSTEM_PROMPT,
+        thinking: { type: "disabled" },
+        output_config: { effort: "low" },
+        messages: [{ role: "user", content: text }],
+      });
+      if (message.stop_reason === "refusal") throw new Error("declined");
+      const block = message.content.find((part) => part.type === "text");
+      const summary = block?.text.trim();
+      if (!summary) throw new Error("empty reply");
+      return summary.slice(0, MAX_SUMMARY_LENGTH);
+    } catch (error) {
+      // Only the model and a short reason: provider replies can echo the prompt back.
+      const reason =
+        error instanceof Anthropic.APIError ? `status ${error.status}` : describe(error);
+      throw new SummaryError(`summary unavailable (${this.options.model}: ${reason})`);
+    }
+  }
+}
+
 class DisabledSummarizer implements Summarizer {
   summarize(): Promise<null> {
     return Promise.resolve(null);
@@ -94,8 +144,14 @@ class DisabledSummarizer implements Summarizer {
 }
 
 export function createSummarizer(
-  options: Omit<OpenRouterOptions, "apiKey"> & { apiKey?: string },
+  options: Omit<OpenRouterOptions, "apiKey"> & {
+    apiKey?: string;
+    anthropic?: Omit<AnthropicOptions, "deadlineMs" | "client">;
+  },
 ): Summarizer {
+  if (options.anthropic) {
+    return new AnthropicSummarizer({ ...options.anthropic, deadlineMs: options.deadlineMs });
+  }
   if (!options.apiKey || options.models.length === 0) return new DisabledSummarizer();
   return new OpenRouterSummarizer({ ...options, apiKey: options.apiKey });
 }

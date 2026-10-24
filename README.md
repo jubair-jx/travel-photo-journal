@@ -12,7 +12,7 @@ A private journal for travel photos. Register, verify your email, sign in (optio
 
 - **Accounts:** registration with email verification (single-use, 24-hour links), sign-in with a short-lived access token and a rotating refresh token, optional TOTP two-factor authentication with a QR code.
 - **Photos:** create, list (paginated, newest first), view, edit (optionally replacing the image) and delete. Images are validated by their actual content, stored privately and shown through short-lived signed links.
-- **Summaries:** a short summary of each description is generated on save via OpenRouter, with model fallback; if it is unavailable, the photo still saves.
+- **Summaries:** a short summary of each description is generated on save with the cheapest Claude model (Haiku, a fraction of a cent per photo), or via OpenRouter with model fallback; if it is unavailable, the photo still saves.
 - **Privacy by construction:** every photo query is scoped to its owner, and another user's photo behaves exactly like one that does not exist.
 
 ## Tech stack, and why
@@ -46,7 +46,7 @@ flowchart LR
   API -->|"Prisma, pooled"| DB[("Neon Postgres")]
   API -->|"S3 API, signed URLs"| R2[("Neon Object Storage<br/>private bucket")]
   API -->|"SMTP"| Mail["Brevo"]
-  API -->|"HTTPS, 8 s deadline"| Summaries["OpenRouter"]
+  API -->|"HTTPS, 8 s deadline"| Summaries["Summary provider<br/>(Anthropic or OpenRouter)"]
   Browser -.->|"signed image links"| R2
 ```
 
@@ -102,20 +102,21 @@ More, including troubleshooting: [docs/devops/development.md](docs/devops/develo
 
 Empty values count as unset. Only the first four are required; the rest have defaults or switch an optional feature on.
 
-| Variable                                                                                                   | Purpose                                                                           |
-| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `APP_URL`                                                                                                  | Public URL of the web app: CORS origin and the base of email links                |
-| `DATABASE_URL`                                                                                             | Postgres connection for the app (pooled in production)                            |
-| `JWT_SECRET`                                                                                               | At least 32 characters; signs access tokens                                       |
-| `TOTP_ENC_KEY`                                                                                             | 32 random bytes, base64; encrypts two-factor secrets                              |
-| `DIRECT_URL`                                                                                               | Direct connection, used only by `prisma migrate`                                  |
-| `NODE_ENV`, `PORT`, `LOG_LEVEL`, `TRUST_PROXY`                                                             | Runtime behavior (`production` makes the refresh cookie Secure)                   |
-| `JWT_ISSUER`, `JWT_AUDIENCE`, `REFRESH_COOKIE_PATH`                                                        | Token claims and cookie path                                                      |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`                                            | Outgoing mail (Mailpit locally, Brevo in production)                              |
-| `STORAGE_DRIVER`, `LOCAL_STORAGE_DIR`, `API_PUBLIC_URL`                                                    | `local` (disk) or `s3`; where the local driver writes and how its links are built |
-| `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_FORCE_PATH_STYLE` | Required when `STORAGE_DRIVER=s3`                                                 |
-| `SIGNED_URL_TTL_SECONDS`                                                                                   | Lifetime of image links (default 900)                                             |
-| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_FALLBACK_MODELS`                                     | Summary generation; without a key and model, summaries are off                    |
+| Variable                                                                                                   | Purpose                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `APP_URL`                                                                                                  | Public URL of the web app: CORS origin and the base of email links                                                |
+| `DATABASE_URL`                                                                                             | Postgres connection for the app (pooled in production)                                                            |
+| `JWT_SECRET`                                                                                               | At least 32 characters; signs access tokens                                                                       |
+| `TOTP_ENC_KEY`                                                                                             | 32 random bytes, base64; encrypts two-factor secrets                                                              |
+| `DIRECT_URL`                                                                                               | Direct connection, used only by `prisma migrate`                                                                  |
+| `NODE_ENV`, `PORT`, `LOG_LEVEL`, `TRUST_PROXY`                                                             | Runtime behavior (`production` makes the refresh cookie Secure)                                                   |
+| `JWT_ISSUER`, `JWT_AUDIENCE`, `REFRESH_COOKIE_PATH`                                                        | Token claims and cookie path                                                                                      |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`                                            | Outgoing mail (Mailpit locally, Brevo in production)                                                              |
+| `STORAGE_DRIVER`, `LOCAL_STORAGE_DIR`, `API_PUBLIC_URL`                                                    | `local` (disk) or `s3`; where the local driver writes and how its links are built                                 |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_FORCE_PATH_STYLE` | Required when `STORAGE_DRIVER=s3`                                                                                 |
+| `SIGNED_URL_TTL_SECONDS`                                                                                   | Lifetime of image links (default 900)                                                                             |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                     | Summary generation (preferred); model defaults to `claude-haiku-5-5`. Without any provider key, summaries are off |
+| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_FALLBACK_MODELS`                                     | Summary generation; without a key and model, summaries are off                                                    |
 
 The web app reads `API_INTERNAL_URL` (where `/api/*` is forwarded) when it is built. Defaults and the complete list are in [docs/devops/development.md](docs/devops/development.md).
 

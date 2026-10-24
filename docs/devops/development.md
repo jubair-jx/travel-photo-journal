@@ -17,7 +17,7 @@ docker compose up --build
 
 Compose starts Postgres, runs the migrations in a one-shot `migrate` service, and only then starts the API and the web app. Uploaded images live in the `uploads` volume. `docker compose down` stops everything; add `-v` to also delete the database and uploads.
 
-Without `OPENROUTER_API_KEY` summaries are switched off and photos simply have no summary.
+Set `ANTHROPIC_API_KEY` (cheapest model by default) or `OPENROUTER_API_KEY` to turn summaries on; without either they are switched off and photos simply have no summary.
 
 ## Option B: run the backend and frontend on your machine
 
@@ -66,6 +66,7 @@ Empty values count as unset. Only the first four are required.
 | `API_PUBLIC_URL`                                                                                           | `http://localhost:<PORT>`              | Base of image links from the local driver                                         |
 | `SIGNED_URL_TTL_SECONDS`                                                                                   | `900`                                  | Lifetime of image links                                                           |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_FORCE_PATH_STYLE` | none                                   | Required when `STORAGE_DRIVER=s3`                                                 |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                     | none, `claude-haiku-5-5`               | Summary generation (preferred provider)                                           |
 | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_FALLBACK_MODELS`                                     | none                                   | Summary generation; without a key and model, summaries are off                    |
 | `OPENROUTER_BASE_URL`                                                                                      | `https://openrouter.ai/api/v1`         |                                                                                   |
 

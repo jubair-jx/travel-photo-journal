@@ -23,6 +23,8 @@ export interface Config {
     models: string[];
     baseUrl: string;
     deadlineMs: number;
+    // Preferred when set: Anthropic's API with the cheapest model.
+    anthropic?: { apiKey: string; model: string };
   };
 }
 
@@ -97,6 +99,8 @@ const envSchema = z
       .enum(["true", "false"])
       .default("true")
       .transform((value) => value === "true"),
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    ANTHROPIC_MODEL: z.string().min(1).default("claude-haiku-5-5"),
     OPENROUTER_API_KEY: z.string().min(1).optional(),
     OPENROUTER_MODEL: z.string().min(1).optional(),
     OPENROUTER_FALLBACK_MODELS: z.string().optional(),
@@ -175,6 +179,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       baseUrl: data.OPENROUTER_BASE_URL,
       // One deadline for the whole attempt across all models (ADR-0006).
       deadlineMs: 8000,
+      ...(data.ANTHROPIC_API_KEY !== undefined && {
+        anthropic: { apiKey: data.ANTHROPIC_API_KEY, model: data.ANTHROPIC_MODEL },
+      }),
     },
   };
 }
