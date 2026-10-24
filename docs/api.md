@@ -136,3 +136,47 @@ Routes behind `requireAuth` expect `Authorization: Bearer <accessToken>`. Anythi
 | 403    | `EMAIL_NOT_VERIFIED`    | Correct password, unverified address.                        |
 | 401    | `INVALID_REFRESH_TOKEN` | Refresh cookie missing, unknown, expired, revoked or reused. |
 | 401    | `UNAUTHENTICATED`       | Missing or invalid access token on a protected route.        |
+
+### POST /auth/2fa/setup
+
+Starts two-factor setup for the signed-in user.
+
+- **Auth:** `Authorization: Bearer <accessToken>`. Rate limited (10 per 15 minutes per client IP).
+- **200:** `{ "success": true, "data": { "qrCodeDataUrl": "data:image/png;base64,...", "manualKey": "BASE32SECRET" } }`. The QR code encodes an `otpauth://` entry labelled `Travel Photo Journal:<email>`; `manualKey` is the same secret for typing by hand.
+- **409 `TWO_FACTOR_ALREADY_ENABLED`:** 2FA is already on. The existing secret is not replaced.
+- **401 `UNAUTHENTICATED`**, **429 `RATE_LIMITED`**
+
+The secret is stored encrypted and **not yet active**. Calling setup again before confirming replaces the pending secret.
+
+### POST /auth/2fa/verify
+
+Confirms the first code from the authenticator app and switches 2FA on.
+
+- **Auth:** bearer access token. Rate limited like setup.
+- **Body:** `{ "code": "123456" }` (exactly six digits)
+- **200:** `{ "success": true, "data": { "enabled": true } }`
+- **400 `INVALID_TOTP_CODE`:** the code does not match. Nothing changes, so a typo cannot lock anyone out.
+- **400 `TWO_FACTOR_NOT_SET_UP`:** no pending secret; call setup first.
+- **400 `VALIDATION_ERROR`:** the code is not six digits.
+- **409 `TWO_FACTOR_ALREADY_ENABLED`**, **401 `UNAUTHENTICATED`**, **429 `RATE_LIMITED`**
+
+A code is accepted if it is the current one or the one from the adjacent 30-second step (clock drift).
+
+### Login with 2FA
+
+`POST /auth/login` accepts an optional `totpCode` (six digits). Once 2FA is enabled:
+
+- correct password, no code: `401 TOTP_REQUIRED`
+- correct password, wrong code, or any wrong password: `401 INVALID_CREDENTIALS`, identical to an ordinary failed login
+- correct password and code: the normal 200 response
+
+Before 2FA is confirmed, login behaves exactly as before.
+
+## Error codes added (2FA)
+
+| Status | Code                         | When                                          |
+| ------ | ---------------------------- | --------------------------------------------- |
+| 401    | `TOTP_REQUIRED`              | Right password, 2FA enabled, no code sent.    |
+| 400    | `INVALID_TOTP_CODE`          | Setup confirmation code does not match.       |
+| 400    | `TWO_FACTOR_NOT_SET_UP`      | Confirming before calling setup.              |
+| 409    | `TWO_FACTOR_ALREADY_ENABLED` | Setup or confirmation when 2FA is already on. |
