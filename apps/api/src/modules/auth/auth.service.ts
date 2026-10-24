@@ -9,6 +9,19 @@ import type { RegisterInput, ResendVerificationInput, VerifyEmailInput } from ".
 
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
+// The one place that decides what a verification token is: the raw value goes into the email,
+// only its hash and expiry are stored.
+function newVerificationToken() {
+  const token = generateToken();
+  return {
+    token,
+    stored: {
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS),
+    },
+  };
+}
+
 export interface AuthServiceDeps {
   prisma: PrismaClient;
   mailer: Mailer;
@@ -35,20 +48,11 @@ export function createAuthService({ prisma, mailer, config, logger }: AuthServic
   async function register({ email, password }: RegisterInput): Promise<{ email: string }> {
     // Hash first, always: duplicate and fresh registrations then cost the same time.
     const passwordHash = await hashPassword(password);
-    const token = generateToken();
+    const { token, stored } = newVerificationToken();
 
     try {
       const user = await prisma.user.create({
-        data: {
-          email,
-          passwordHash,
-          emailVerificationTokens: {
-            create: {
-              tokenHash: hashToken(token),
-              expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS),
-            },
-          },
-        },
+        data: { email, passwordHash, emailVerificationTokens: { create: stored } },
         select: { id: true },
       });
       await sendVerificationEmail(user.id, email, token);
@@ -96,17 +100,11 @@ export function createAuthService({ prisma, mailer, config, logger }: AuthServic
     });
 
     if (user && user.emailVerifiedAt === null) {
-      const token = generateToken();
+      const { token, stored } = newVerificationToken();
       // Replace, not add: only the newest link should work.
       await prisma.$transaction([
         prisma.emailVerificationToken.deleteMany({ where: { userId: user.id, usedAt: null } }),
-        prisma.emailVerificationToken.create({
-          data: {
-            userId: user.id,
-            tokenHash: hashToken(token),
-            expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS),
-          },
-        }),
+        prisma.emailVerificationToken.create({ data: { userId: user.id, ...stored } }),
       ]);
       // Not awaited: the response must take the same time whether or not an email was sent,
       // otherwise latency reveals which addresses have unverified accounts.
