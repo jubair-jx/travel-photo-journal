@@ -118,7 +118,11 @@ export class ConfigError extends Error {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
-  const result = envSchema.safeParse(env);
+  // `KEY=` in a .env file, or an unset variable passed through by Docker Compose, arrives as an
+  // empty string. For every setting that means "not set", so defaults apply and optional features
+  // stay off; required settings are then reported as missing.
+  const present = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ""));
+  const result = envSchema.safeParse(present);
   if (!result.success) {
     // Names and reasons only: the offending values may be secrets.
     const lines = result.error.issues.map(

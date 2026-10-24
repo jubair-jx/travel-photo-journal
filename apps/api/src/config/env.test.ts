@@ -135,6 +135,37 @@ describe("loadConfig", () => {
     expect(attempt).not.toThrow(/R2_BUCKET/);
   });
 
+  it("treats empty values as not set, so a copied .env.example works", () => {
+    const config = loadConfig({
+      ...required,
+      SMTP_HOST: "",
+      SMTP_USER: "",
+      SMTP_PASS: "",
+      MAIL_FROM: "",
+      OPENROUTER_API_KEY: "",
+      OPENROUTER_MODEL: "",
+      OPENROUTER_FALLBACK_MODELS: "",
+      API_PUBLIC_URL: "",
+      R2_BUCKET: "",
+      PORT: "",
+      LOG_LEVEL: "",
+    });
+
+    expect(config.port).toBe(4000);
+    expect(config.logLevel).toBe("info");
+    expect(config.mail.smtp).toEqual({ host: "localhost", port: 1025 });
+    expect(config.summary.models).toEqual([]);
+    expect(config.summary.apiKey).toBeUndefined();
+    expect(config.storage).toMatchObject({
+      driver: "local",
+      publicBaseUrl: "http://localhost:4000",
+    });
+  });
+
+  it("still requires the required variables when they are empty", () => {
+    expect(() => loadConfig({ ...required, JWT_SECRET: "" })).toThrow(/JWT_SECRET/);
+  });
+
   it("rejects a short JWT secret without echoing it", () => {
     const attempt = () => loadConfig({ ...required, JWT_SECRET: "too-short-s3cr3t" });
 
