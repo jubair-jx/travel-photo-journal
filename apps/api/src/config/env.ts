@@ -10,6 +10,8 @@ export interface Config {
   jwt: { secret: string; issuer: string; audience: string };
   // Path attribute of the refresh cookie; must match the URL path the browser sees.
   refreshCookiePath: string;
+  // AES-256 key protecting TOTP secrets at rest.
+  totpEncryptionKey: Buffer;
   mail: {
     from: string;
     smtp: { host: string; port: number; user?: string; pass?: string };
@@ -34,6 +36,11 @@ const envSchema = z
     JWT_ISSUER: z.string().min(1).default("travel-photo-journal"),
     JWT_AUDIENCE: z.string().min(1).default("travel-photo-journal-web"),
     REFRESH_COOKIE_PATH: z.string().startsWith("/").default("/"),
+    TOTP_ENC_KEY: z
+      .string()
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/, "Must be base64")
+      .transform((value) => Buffer.from(value, "base64"))
+      .refine((key) => key.length === 32, "Must decode to exactly 32 bytes"),
     SMTP_HOST: z.string().min(1).optional(),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(1025),
     SMTP_USER: z.string().min(1).optional(),
@@ -77,6 +84,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     databaseUrl: data.DATABASE_URL,
     jwt: { secret: data.JWT_SECRET, issuer: data.JWT_ISSUER, audience: data.JWT_AUDIENCE },
     refreshCookiePath: data.REFRESH_COOKIE_PATH,
+    totpEncryptionKey: data.TOTP_ENC_KEY,
     mail: {
       from: data.MAIL_FROM ?? "Travel Photo Journal <no-reply@localhost>",
       smtp: {

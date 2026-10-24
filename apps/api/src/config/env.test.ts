@@ -5,6 +5,8 @@ const required = {
   APP_URL: "http://localhost:3000",
   DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
   JWT_SECRET: "a-secret-that-is-comfortably-over-32-chars",
+  // 32 bytes, base64
+  TOTP_ENC_KEY: Buffer.alloc(32, 7).toString("base64"),
 };
 
 describe("loadConfig", () => {
@@ -24,6 +26,7 @@ describe("loadConfig", () => {
         audience: "travel-photo-journal-web",
       },
       refreshCookiePath: "/",
+      totpEncryptionKey: Buffer.alloc(32, 7),
       mail: {
         from: "Travel Photo Journal <no-reply@localhost>",
         smtp: { host: "localhost", port: 1025 },
@@ -81,6 +84,16 @@ describe("loadConfig", () => {
 
     expect(attempt).toThrow(/JWT_SECRET/);
     expect(attempt).not.toThrow(/s3cr3t/);
+  });
+
+  it.each([
+    ["too short", Buffer.alloc(16, 1).toString("base64")],
+    ["not base64 at all", "s3cr3t-key-!!!"],
+  ])("rejects a TOTP key that is %s without echoing it", (_label, key) => {
+    const attempt = () => loadConfig({ ...required, TOTP_ENC_KEY: key });
+
+    expect(attempt).toThrow(/TOTP_ENC_KEY/);
+    expect(attempt).not.toThrow(new RegExp(key.slice(0, 8)));
   });
 
   it("requires APP_URL and DATABASE_URL", () => {
