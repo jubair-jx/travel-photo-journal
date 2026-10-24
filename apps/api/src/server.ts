@@ -2,17 +2,23 @@ import "dotenv/config";
 import { createApp } from "./app.js";
 import { ConfigError, loadConfig } from "./config/env.js";
 import { createLogger } from "./lib/logger.js";
+import { createSmtpMailer } from "./lib/mailer.js";
+import { createPrismaClient } from "./lib/prisma.js";
 
 function main(): void {
   const config = loadConfig(process.env);
   const logger = createLogger(config.logLevel);
-  const server = createApp({ config, logger }).listen(config.port, () => {
+  const prisma = createPrismaClient(config.databaseUrl);
+  const mailer = createSmtpMailer(config.mail);
+  const server = createApp({ config, logger, prisma, mailer }).listen(config.port, () => {
     logger.info({ port: config.port, env: config.nodeEnv }, "api listening");
   });
 
   const shutdown = (signal: string): void => {
     logger.info({ signal }, "shutting down");
-    server.close(() => process.exit(0));
+    server.close(() => {
+      void prisma.$disconnect().finally(() => process.exit(0));
+    });
   };
   process.on("SIGTERM", () => {
     shutdown("SIGTERM");

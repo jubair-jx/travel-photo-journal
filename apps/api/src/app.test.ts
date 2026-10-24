@@ -1,8 +1,7 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-import { createApp } from "./app.js";
 import { createLogger } from "./lib/logger.js";
-import { buildTestApp, testConfig } from "./test/helpers.js";
+import { buildTestApp, buildTestContext } from "./test/helpers.js";
 
 describe("GET /health", () => {
   it("responds 200 in the success envelope", async () => {
@@ -89,7 +88,7 @@ describe("request logging", () => {
   it("logs the request outcome without credentials", async () => {
     const lines: string[] = [];
     const logger = createLogger("info", { write: (line) => lines.push(line) });
-    const app = createApp({ config: testConfig, logger });
+    const { app } = buildTestContext({ logger });
 
     await request(app)
       .get("/health")

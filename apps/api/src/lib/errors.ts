@@ -18,3 +18,9 @@ export const validationError = (details?: unknown, message = "Invalid request"):
 
 export const tooManyRequests = (): AppError =>
   new AppError(429, "RATE_LIMITED", "Too many requests, try again later");
+
+export const emailTaken = (): AppError =>
+  new AppError(409, "EMAIL_TAKEN", "An account with this email already exists");
+
+export const invalidToken = (): AppError =>
+  new AppError(400, "INVALID_TOKEN", "Verification link is invalid or has expired");
