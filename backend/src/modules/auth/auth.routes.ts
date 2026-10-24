@@ -87,6 +87,27 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
 
   router.post("/logout", createRateLimiter(limits.session), session.logout);
 
+  router.get(
+    "/sessions",
+    createRateLimiter(limits.session),
+    requireAuth(accessTokens),
+    session.listSessions,
+  );
+
+  router.delete(
+    "/sessions/:id",
+    createRateLimiter(limits.session),
+    requireAuth(accessTokens),
+    session.revokeSession,
+  );
+
+  router.delete(
+    "/sessions",
+    createRateLimiter(limits.session),
+    requireAuth(accessTokens),
+    session.revokeAllSessions,
+  );
+
   router.post(
     "/2fa/setup",
     createRateLimiter(limits.twoFactor),

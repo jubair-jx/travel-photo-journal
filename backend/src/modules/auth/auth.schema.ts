@@ -29,3 +29,5 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const verifyTwoFactorSchema = z.object({ code: totpCode });
 export type VerifyTwoFactorInput = z.infer<typeof verifyTwoFactorSchema>;
+
+export const sessionIdSchema = z.uuid();

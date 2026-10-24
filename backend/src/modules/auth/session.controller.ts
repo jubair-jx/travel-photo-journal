@@ -1,8 +1,10 @@
 import type { CookieOptions, Request, RequestHandler, Response } from "express";
 import type { ParamsDictionary } from "express-serve-static-core";
 import type { Config } from "../../config/env.js";
-import { AppError } from "../../lib/errors.js";
+import { AppError, sessionNotFound } from "../../lib/errors.js";
 import { sendSuccess } from "../../lib/response.js";
+import { authenticatedUserId } from "../../middleware/auth.js";
+import { sessionIdSchema } from "./auth.schema.js";
 import type { LoginInput } from "./auth.schema.js";
 import {
   REFRESH_TOKEN_TTL_MS,
@@ -41,7 +43,7 @@ export function createSessionController(service: SessionService, config: Config)
   }
 
   const login: RequestHandler<ParamsDictionary, unknown, LoginInput> = async (req, res) => {
-    respondWithSession(res, await service.login(req.body));
+    respondWithSession(res, await service.login(req.body, req.get("user-agent")));
   };
 
   const refresh: RequestHandler = async (req, res) => {
@@ -62,5 +64,28 @@ export function createSessionController(service: SessionService, config: Config)
     sendSuccess(res, null);
   };
 
-  return { login, refresh, logout };
+  const listSessions: RequestHandler = async (req, res) => {
+    sendSuccess(res, await service.listSessions(authenticatedUserId(req), readRefreshToken(req)));
+  };
+
+  const revokeSession: RequestHandler = async (req, res) => {
+    // A malformed id cannot belong to anyone, so it is "not found" like any other miss.
+    const id = sessionIdSchema.safeParse(req.params["id"]);
+    if (!id.success) throw sessionNotFound();
+    const { wasCurrent } = await service.revokeSession(
+      authenticatedUserId(req),
+      id.data,
+      readRefreshToken(req),
+    );
+    if (wasCurrent) res.clearCookie(REFRESH_COOKIE, cookieOptions);
+    sendSuccess(res, null);
+  };
+
+  const revokeAllSessions: RequestHandler = async (req, res) => {
+    await service.revokeAllSessions(authenticatedUserId(req));
+    res.clearCookie(REFRESH_COOKIE, cookieOptions);
+    sendSuccess(res, null);
+  };
+
+  return { login, refresh, logout, listSessions, revokeSession, revokeAllSessions };
 }

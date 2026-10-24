@@ -9,6 +9,7 @@ import {
   emailNotVerified,
   invalidCredentials,
   invalidRefreshToken,
+  sessionNotFound,
   totpRequired,
 } from "../../lib/errors.js";
 import type { AccessTokenService } from "../../lib/jwt.js";
@@ -17,6 +18,16 @@ import { verifyTotp } from "../../lib/totp.js";
 import type { LoginInput } from "./auth.schema.js";
 
 export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const MAX_USER_AGENT_LENGTH = 300;
+
+export interface SessionInfo {
+  id: string;
+  userAgent: string | null;
+  startedAt: Date;
+  lastActiveAt: Date;
+  current: boolean;
+}
 
 export interface SessionServiceDeps {
   prisma: PrismaClient;
@@ -41,13 +52,17 @@ export function createSessionService({
   accessTokens,
   totpEncryptionKey,
 }: SessionServiceDeps) {
-  async function startSession(user: { id: string; email: string }): Promise<SessionTokens> {
+  async function startSession(
+    user: { id: string; email: string },
+    userAgent: string | undefined,
+  ): Promise<SessionTokens> {
     const refreshToken = generateToken();
     await prisma.refreshToken.create({
       data: {
         userId: user.id,
         tokenHash: hashToken(refreshToken),
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+        userAgent: userAgent?.slice(0, MAX_USER_AGENT_LENGTH) ?? null,
       },
     });
     const { token, expiresIn } = await accessTokens.sign(user.id);
@@ -59,7 +74,10 @@ export function createSessionService({
     };
   }
 
-  async function login({ email, password, totpCode }: LoginInput): Promise<SessionTokens> {
+  async function login(
+    { email, password, totpCode }: LoginInput,
+    userAgent?: string,
+  ): Promise<SessionTokens> {
     const user = await prisma.user.findUnique({ where: { email } });
     const matches = await verifyPassword(user?.passwordHash ?? (await getDummyHash()), password);
     if (!user || !matches) throw invalidCredentials();
@@ -74,7 +92,7 @@ export function createSessionService({
       if (!(await verifyTotp(secret, totpCode))) throw invalidCredentials();
     }
 
-    return startSession(user);
+    return startSession(user, userAgent);
   }
 
   // A token that was already rotated or revoked is being presented again, which means a copy of it
@@ -115,7 +133,13 @@ export function createSessionService({
 
       const old = await tx.refreshToken.findUniqueOrThrow({
         where: { tokenHash },
-        select: { id: true, user: { select: { id: true, email: true } } },
+        select: {
+          id: true,
+          userAgent: true,
+          sessionId: true,
+          sessionStartedAt: true,
+          user: { select: { id: true, email: true } },
+        },
       });
       const refreshToken = generateToken();
       const successor = await tx.refreshToken.create({
@@ -123,6 +147,9 @@ export function createSessionService({
           userId: old.user.id,
           tokenHash: hashToken(refreshToken),
           expiresAt: new Date(now.getTime() + REFRESH_TOKEN_TTL_MS),
+          userAgent: old.userAgent,
+          sessionId: old.sessionId,
+          sessionStartedAt: old.sessionStartedAt,
         },
         select: { id: true },
       });
@@ -155,7 +182,61 @@ export function createSessionService({
     });
   }
 
-  return { login, refresh, logout };
+  // A session is the one live (unrevoked, unexpired) token in a rotation chain. `presented` is the
+  // caller's own refresh cookie, used only to mark which row is theirs.
+  async function listSessions(
+    userId: string,
+    presented: string | undefined,
+  ): Promise<SessionInfo[]> {
+    const currentHash = presented ? hashToken(presented) : undefined;
+    const rows = await prisma.refreshToken.findMany({
+      where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        sessionId: true,
+        tokenHash: true,
+        userAgent: true,
+        sessionStartedAt: true,
+        createdAt: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.sessionId,
+      userAgent: row.userAgent,
+      startedAt: row.sessionStartedAt,
+      lastActiveAt: row.createdAt,
+      current: row.tokenHash === currentHash,
+    }));
+  }
+
+  // Scoped by user in the query itself, so another user's session id is simply "not found".
+  async function revokeSession(
+    userId: string,
+    sessionId: string,
+    presented: string | undefined,
+  ): Promise<{ wasCurrent: boolean }> {
+    const target = await prisma.refreshToken.findFirst({
+      where: { sessionId, userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      select: { id: true, tokenHash: true },
+    });
+    if (!target) throw sessionNotFound();
+    await prisma.refreshToken.updateMany({
+      where: { id: target.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return { wasCurrent: presented !== undefined && target.tokenHash === hashToken(presented) };
+  }
+
+  // Sign out everywhere. Access tokens already issued stay valid until they expire (15 minutes).
+  async function revokeAllSessions(userId: string): Promise<number> {
+    const { count } = await prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return count;
+  }
+
+  return { login, refresh, logout, listSessions, revokeSession, revokeAllSessions };
 }
 
 export type SessionService = ReturnType<typeof createSessionService>;

@@ -13,6 +13,7 @@ import {
   type FieldIssue,
   type Photo,
   type PhotoPage,
+  type SessionInfo,
   type TwoFactorSetup,
 } from "../lib/types";
 import { restoreSession } from "./session";
@@ -99,7 +100,7 @@ export interface Credentials {
 export const api = createApi({
   reducerPath: "api",
   baseQuery,
-  tagTypes: ["Photo"],
+  tagTypes: ["Photo", "Session"],
   endpoints: (build) => ({
     register: build.mutation<{ email: string }, { email: string; password: string }>({
       query: (body) => ({ url: "/auth/register", method: "POST", body }),
@@ -134,6 +135,27 @@ export const api = createApi({
         }
       },
     }),
+    listSessions: build.query<SessionInfo[], void>({
+      query: () => "/auth/sessions",
+      providesTags: ["Session"],
+    }),
+    revokeSession: build.mutation<null, string>({
+      query: (id) => ({ url: `/auth/sessions/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Session"],
+    }),
+    revokeAllSessions: build.mutation<null, void>({
+      query: () => ({ url: "/auth/sessions", method: "DELETE" }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // The server ended this browser's session too, so stop acting as signed in.
+          dispatch(signedOut());
+          dispatch(api.util.resetApiState());
+        } catch {
+          // The caller sees the error and nothing changes.
+        }
+      },
+    }),
     setupTwoFactor: build.mutation<TwoFactorSetup, void>({
       query: () => ({ url: "/auth/2fa/setup", method: "POST" }),
     }),
@@ -165,6 +187,9 @@ export const {
   useResendVerificationMutation,
   useLoginMutation,
   useLogoutMutation,
+  useListSessionsQuery,
+  useRevokeSessionMutation,
+  useRevokeAllSessionsMutation,
   useSetupTwoFactorMutation,
   useVerifyTwoFactorMutation,
   useListPhotosQuery,

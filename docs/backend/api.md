@@ -128,6 +128,29 @@ Ends the current session.
 - **Auth:** the refresh cookie, if present. Rate limited like refresh.
 - **200:** `{ "success": true, "data": null }` and a cleared cookie. Always succeeds, including with no cookie or an unknown one, so it is safe to call twice. Other sessions of the same user (other devices) are untouched.
 
+### GET /auth/sessions
+
+Lists the devices the user is signed in on.
+
+- **Auth:** bearer access token. The refresh cookie, if sent, marks which row is the caller's own. Rate limited like refresh.
+- **200:** `data` is an array of `{ id, userAgent, startedAt, lastActiveAt, current }`, newest activity first. `id` is stable for the life of a session across refresh rotations. Revoked and expired sessions are not listed. Only the caller's own sessions are ever returned.
+
+### DELETE /auth/sessions/:id
+
+Signs out one device.
+
+- **Auth:** bearer access token.
+- **200:** `{ "success": true, "data": null }`. If the id is the caller's own session the refresh cookie is cleared too.
+- **404 `NOT_FOUND`:** the session does not exist, is already ended, is malformed, or belongs to someone else. These cases are deliberately indistinguishable (ADR-0007).
+
+### DELETE /auth/sessions
+
+Signs out every device, including the caller's.
+
+- **Auth:** bearer access token.
+- **200:** `{ "success": true, "data": null }` and a cleared cookie.
+- Access tokens already issued remain valid until they expire (15 minutes); only refresh is cut off.
+
 ### Protected routes
 
 Routes behind `requireAuth` expect `Authorization: Bearer <accessToken>`. Anything else (missing header, wrong scheme, bad signature, expired, wrong issuer or audience, wrong algorithm) gets the same `401 UNAUTHENTICATED`.
