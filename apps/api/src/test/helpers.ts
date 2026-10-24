@@ -20,6 +20,7 @@ export const testConfig: Config = {
     audience: "tpj-test-web",
   },
   refreshCookiePath: "/",
+  totpEncryptionKey: Buffer.alloc(32, 9),
   mail: { from: "Journal <no-reply@test.local>", smtp: { host: "localhost", port: 1025 } },
 };
 
@@ -28,6 +29,7 @@ const generousLimits: AuthRateLimits = {
   register: { windowMs: 60_000, limit: 10_000 },
   login: { windowMs: 60_000, limit: 10_000 },
   session: { windowMs: 60_000, limit: 10_000 },
+  twoFactor: { windowMs: 60_000, limit: 10_000 },
   verifyEmail: { windowMs: 60_000, limit: 10_000 },
   resendVerification: { windowMs: 60_000, limit: 10_000 },
 };

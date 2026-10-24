@@ -17,6 +17,7 @@ import {
 } from "./modules/auth/auth.routes.js";
 import { createAuthService } from "./modules/auth/auth.service.js";
 import { createSessionService } from "./modules/auth/session.service.js";
+import { createTwoFactorService } from "./modules/auth/two-factor.service.js";
 
 export interface AppDeps {
   config: Config;
@@ -42,15 +43,21 @@ export function createApp(deps: AppDeps): Express {
 
   const accessTokens = createAccessTokenService(deps.config.jwt);
   const authService = createAuthService(deps);
-  const sessionService = createSessionService({ prisma: deps.prisma, accessTokens });
+  const sessionService = createSessionService({
+    prisma: deps.prisma,
+    accessTokens,
+    totpEncryptionKey: deps.config.totpEncryptionKey,
+  });
   app.use(
     "/auth",
-    createAuthRouter(
-      authService,
-      sessionService,
-      deps.config,
-      deps.authRateLimits ?? defaultAuthRateLimits,
-    ),
+    createAuthRouter({
+      registration: authService,
+      sessions: sessionService,
+      twoFactor: createTwoFactorService({ prisma: deps.prisma, config: deps.config }),
+      accessTokens,
+      config: deps.config,
+      limits: deps.authRateLimits ?? defaultAuthRateLimits,
+    }),
   );
 
   app.use(notFoundHandler);

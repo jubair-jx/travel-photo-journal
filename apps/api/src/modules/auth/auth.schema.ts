@@ -16,7 +16,16 @@ export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export const resendVerificationSchema = z.object({ email });
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
 
+const totpCode = z.string().regex(/^\d{6}$/, "Must be 6 digits");
+
 // No length rule on login: the password policy applies when choosing one, and echoing it back here
 // would only help someone probing which passwords are acceptable.
-export const loginSchema = z.object({ email, password: z.string().min(1).max(128) });
+export const loginSchema = z.object({
+  email,
+  password: z.string().min(1).max(128),
+  totpCode: totpCode.optional(),
+});
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const verifyTwoFactorSchema = z.object({ code: totpCode });
+export type VerifyTwoFactorInput = z.infer<typeof verifyTwoFactorSchema>;

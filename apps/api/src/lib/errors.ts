@@ -36,3 +36,15 @@ export const emailNotVerified = (): AppError =>
 
 export const invalidRefreshToken = (): AppError =>
   new AppError(401, "INVALID_REFRESH_TOKEN", "Session expired, sign in again");
+
+export const totpRequired = (): AppError =>
+  new AppError(401, "TOTP_REQUIRED", "A two-factor authentication code is required");
+
+export const twoFactorAlreadyEnabled = (): AppError =>
+  new AppError(409, "TWO_FACTOR_ALREADY_ENABLED", "Two-factor authentication is already enabled");
+
+export const twoFactorNotSetUp = (): AppError =>
+  new AppError(400, "TWO_FACTOR_NOT_SET_UP", "Start two-factor setup before confirming a code");
+
+export const invalidTotpCode = (): AppError =>
+  new AppError(400, "INVALID_TOTP_CODE", "That code is not valid");
