@@ -24,3 +24,15 @@ export const emailTaken = (): AppError =>
 
 export const invalidToken = (): AppError =>
   new AppError(400, "INVALID_TOKEN", "Verification link is invalid or has expired");
+
+export const unauthenticated = (): AppError =>
+  new AppError(401, "UNAUTHENTICATED", "Authentication required");
+
+export const invalidCredentials = (): AppError =>
+  new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+
+export const emailNotVerified = (): AppError =>
+  new AppError(403, "EMAIL_NOT_VERIFIED", "Verify your email address before signing in");
+
+export const invalidRefreshToken = (): AppError =>
+  new AppError(401, "INVALID_REFRESH_TOKEN", "Session expired, sign in again");
