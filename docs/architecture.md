@@ -6,7 +6,7 @@ An npm-workspaces monorepo: `apps/api` (Express, TypeScript, Prisma) and `apps/w
 
 ## API composition
 
-`createApp(deps)` is the single place the application is assembled. It receives its collaborators as arguments (config, logger now; mailer, storage and summarizer in later slices) and returns an Express app. Nothing reads `process.env` or constructs a client at import time, so tests build an app with fakes and production builds one with real implementations (ADR-0001).
+`createApp(deps)` is the single place the application is assembled. It receives its collaborators as arguments (config, logger, Prisma client and mailer so far; storage and summarizer in the photos slice) and returns an Express app. Nothing reads `process.env` or constructs a client at import time, so tests build an app with fakes and production builds one with real implementations (ADR-0001).
 
 `server.ts` is the only entrypoint: it loads and validates configuration, builds the logger and app, listens, and shuts down on SIGTERM/SIGINT.
 
@@ -38,6 +38,21 @@ Code anywhere in the request path throws or forwards an `AppError(status, code, 
 
 pino, with path-based redaction for password, token, authorization, cookie and Set-Cookie fields at several depths, and request/response serializers that log only what is needed. Redaction is the second line of defence; the serializers are the first.
 
+## Feature modules
+
+Each module owns its HTTP surface and business logic:
+
+- `*.routes.ts` wires paths to middleware (rate limit, validation) and controller handlers.
+- `*.controller.ts` is thin: it takes the already-validated request body, calls the service and writes the response envelope.
+- `*.service.ts` holds the behavior. It is built by a factory that receives its dependencies (database, mailer, config, logger), so it has no hidden globals.
+- `*.schema.ts` holds the Zod input schemas; they are the single definition of what each endpoint accepts.
+
+`auth` today covers register, verify-email and resend-verification.
+
+## Data and mail
+
+Prisma is the only database access (pooled URL at runtime, direct URL for migrations; see database.md). Outbound email goes through the `Mailer` interface; the SMTP implementation targets Mailpit locally and Brevo in production, and tests substitute a recording fake.
+
 ## Testing approach
 
-Vitest and supertest drive the app through HTTP. Infrastructure modules are tested through their public interface (a throwaway Express app for middleware, a captured stream for the logger). The database harness arrives with the first model.
+Vitest and supertest drive the app through HTTP. Infrastructure modules are tested through their public interface (a throwaway Express app for middleware, a captured stream for the logger). Integration tests run against a real Postgres (compose locally, a service container in CI); global setup migrates it, and each test resets the tables through Prisma. The mailer is replaced by a fake that records messages, so tests read verification links the way a user would. Selected tests were mutation-checked (breaking the code on purpose) to confirm they fail when the behavior breaks.

@@ -50,3 +50,48 @@ Liveness check. Does not touch the database, so a database outage does not take 
 
 - **Auth:** none
 - **200:** `{ "success": true, "data": { "status": "ok" } }`
+
+### POST /auth/register
+
+Creates an **Unverified User** and emails a verification link.
+
+- **Auth:** none. Rate limited (10 per hour per client IP).
+- **Body:** `{ "email": string, "password": string }`. The email is trimmed and lowercased; the password is 8 to 128 characters.
+- **201:** `{ "success": true, "data": { "email": "me@example.com" } }`
+- **400 `VALIDATION_ERROR`:** malformed email or weak password, with field `details`.
+- **409 `EMAIL_TAKEN`:** the address is already registered, whatever its letter case (ADR-0008).
+- **429 `RATE_LIMITED`**
+
+If the email cannot be sent, the account is still created and the request still returns 201; the failure is logged and `POST /auth/resend-verification` is the recovery path.
+
+### POST /auth/verify-email
+
+Consumes the token from the emailed link and marks the account verified.
+
+- **Auth:** none. Rate limited (30 per 15 minutes per client IP).
+- **Body:** `{ "token": string }`
+- **200:** `{ "success": true, "data": { "verified": true } }`
+- **400 `INVALID_TOKEN`:** the token is unknown, already used, expired, or replaced by a newer one. These cases are deliberately indistinguishable.
+- **400 `VALIDATION_ERROR`:** missing token.
+- **429 `RATE_LIMITED`**
+
+A token works exactly once; if two requests carry the same token at the same time, one succeeds and the other receives `INVALID_TOKEN`.
+
+### POST /auth/resend-verification
+
+Issues a new verification link to an unverified account.
+
+- **Auth:** none. Rate limited (5 per hour per client IP).
+- **Body:** `{ "email": string }`
+- **200:** always the same body, whether or not the account exists or is already verified:
+  `{ "success": true, "data": { "message": "If an unverified account exists for that email, a new verification link has been sent." } }`
+- **400 `VALIDATION_ERROR`**, **429 `RATE_LIMITED`**
+
+For an unverified account, earlier unused links stop working and the new one is emailed. The email is sent in the background so SMTP latency does not reveal whether the account exists; a difference of a few database round trips remains.
+
+## Error codes added
+
+| Status | Code            | When                                                   |
+| ------ | --------------- | ------------------------------------------------------ |
+| 409    | `EMAIL_TAKEN`   | Registering an address that already has an account.    |
+| 400    | `INVALID_TOKEN` | Verification token unknown, used, expired or replaced. |
