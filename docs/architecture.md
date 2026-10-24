@@ -2,7 +2,7 @@
 
 ## Shape
 
-An npm-workspaces monorepo: `backend` (Express, TypeScript, Prisma) and `frontend` (Next.js). The web app proxies `/api/*` to the API so that the refresh cookie is same-origin (ADR-0004).
+A monorepo of two independent packages (each with its own dependencies and tooling): `backend` (Express, TypeScript, Prisma) and `frontend` (Next.js). The web app proxies `/api/*` to the API so that the refresh cookie is same-origin (ADR-0004).
 
 ## API composition
 
@@ -57,9 +57,9 @@ Prisma is the only database access (pooled URL at runtime, direct URL for migrat
 
 ## Storage and summaries
 
-`StorageService` (upload, delete, getSignedUrl) has two drivers selected by `STORAGE_DRIVER`: local disk for development and tests (files served by the API through HMAC-signed, expiring links) and Cloudflare R2 for production (presigned GET links). `Summarizer` has an OpenRouter implementation that tries the configured model and then the fallback list inside one 8-second deadline, and a disabled implementation used when no API key or model is configured, so the whole application runs without any external credentials.
+`StorageService` (upload, delete, getSignedUrl) has two drivers selected by `STORAGE_DRIVER`: local disk for development and tests (files served by the API through HMAC-signed, expiring links) and an S3-compatible bucket (Neon Object Storage) for production (presigned GET links). `Summarizer` has an OpenRouter implementation that tries the configured model and then the fallback list inside one 8-second deadline, and a disabled implementation used when no API key or model is configured, so the whole application runs without any external credentials.
 
-The upload pipeline is: multer (memory, 5 MB, one file), then a magic-byte check, then the service. Create runs summarization and the storage upload concurrently and inserts one row; if the insert fails the uploaded object is removed.
+The upload pipeline is: multer (memory, 10 MB, one file), then a magic-byte check, then the service. Create runs summarization and the storage upload concurrently and inserts one row; if the insert fails the uploaded object is removed.
 
 ## Web application
 

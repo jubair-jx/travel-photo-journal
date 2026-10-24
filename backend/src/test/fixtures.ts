@@ -24,4 +24,4 @@ export const webp = Buffer.concat([
 export const textFile = Buffer.from("this is not an image, whatever the header claims");
 
 // Valid PNG signature followed by padding, to exceed the size limit while still looking like a PNG.
-export const oversizePng = Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024 + 1)]);
+export const oversizePng = Buffer.concat([png, Buffer.alloc(10 * 1024 * 1024 + 1)]);

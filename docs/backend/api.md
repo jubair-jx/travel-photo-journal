@@ -17,7 +17,11 @@ Base URL: the API root (no path prefix). In the web app, the same endpoints are 
 ```json
 {
   "success": false,
-  "error": { "code": "VALIDATION_ERROR", "message": "Invalid request", "details": [] }
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid request",
+    "details": []
+  }
 }
 ```
 
@@ -207,10 +211,10 @@ All photo routes require `Authorization: Bearer <accessToken>` and only ever tou
 
 Creates a photo. `multipart/form-data` with the fields `image` (file), `name`, `location`, `description`.
 
-- **Limits:** `name` and `location` 1 to 120 characters, `description` 1 to 2000, all trimmed. Image: JPEG, PNG or WebP, at most 5 MB.
+- **Limits:** `name` and `location` 1 to 120 characters, `description` 1 to 2000, all trimmed. Image: JPEG, PNG or WebP, at most 10 MB.
 - **201:** the photo object.
 - **400 `VALIDATION_ERROR`:** a text field is missing or too long, the image is missing, or a file was sent under a field other than `image`. `details` lists each failing `path`.
-- **413 `PAYLOAD_TOO_LARGE`:** the image is over 5 MB.
+- **413 `PAYLOAD_TOO_LARGE`:** the image is over 10 MB.
 - **415 `UNSUPPORTED_MEDIA_TYPE`:** the file is not a JPEG, PNG or WebP. The decision is made from the file's own bytes; the filename and `Content-Type` the client sends are ignored.
 - **401 `UNAUTHENTICATED`**
 
@@ -248,8 +252,8 @@ When `STORAGE_DRIVER=local`, the API serves image bytes itself at the URLs it ha
 
 ## Error codes added (photos)
 
-| Status | Code                     | When                                                   |
-| ------ | ------------------------ | ------------------------------------------------------ |
-| 413    | `PAYLOAD_TOO_LARGE`      | Image over 5 MB (JSON bodies over 100 KB also use it). |
-| 415    | `UNSUPPORTED_MEDIA_TYPE` | Upload is not a JPEG, PNG or WebP.                     |
-| 403    | `INVALID_LINK`           | Local-driver image link is tampered with or expired.   |
+| Status | Code                     | When                                                    |
+| ------ | ------------------------ | ------------------------------------------------------- |
+| 413    | `PAYLOAD_TOO_LARGE`      | Image over 10 MB (JSON bodies over 100 KB also use it). |
+| 415    | `UNSUPPORTED_MEDIA_TYPE` | Upload is not a JPEG, PNG or WebP.                      |
+| 403    | `INVALID_LINK`           | Local-driver image link is tampered with or expired.    |

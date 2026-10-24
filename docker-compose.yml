@@ -13,8 +13,8 @@ name: travel-photo-journal
 x-api-image: &api-image
   image: travel-photo-journal-api
   build:
-    context: .
-    dockerfile: backend/Dockerfile
+    context: ./backend
+    dockerfile: Dockerfile
 
 services:
   postgres:
@@ -83,8 +83,8 @@ services:
 
   web:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
       args:
         API_INTERNAL_URL: http://api:4000
     ports:

@@ -2,19 +2,21 @@ import { describe, expect, it } from "vitest";
 import { testConfig } from "../test/helpers.js";
 import { createStorage } from "./storage.factory.js";
 import { LocalDiskStorage } from "./storage.local.js";
-import { R2Storage } from "./storage.r2.js";
+import { S3Storage } from "./storage.s3.js";
 
 describe("createStorage", () => {
   it("builds the local-disk driver for local config", () => {
     expect(createStorage(testConfig)).toBeInstanceOf(LocalDiskStorage);
   });
 
-  it("builds the R2 driver for R2 config", () => {
+  it("builds the S3 driver for S3 config", () => {
     const storage = createStorage({
       ...testConfig,
       storage: {
-        driver: "r2",
-        accountId: "acct",
+        driver: "s3",
+        endpoint: "https://s3.example.test",
+        region: "us-east-2",
+        forcePathStyle: true,
         accessKeyId: "key-id",
         secretAccessKey: "key-secret",
         bucket: "photos",
@@ -22,7 +24,7 @@ describe("createStorage", () => {
       },
     });
 
-    expect(storage).toBeInstanceOf(R2Storage);
+    expect(storage).toBeInstanceOf(S3Storage);
   });
 
   it("derives different local link-signing keys from different JWT secrets", async () => {

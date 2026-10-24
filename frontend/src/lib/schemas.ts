@@ -48,6 +48,6 @@ export function validateImage(
   if (!(ACCEPTED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
     return "Use a JPEG, PNG or WebP image";
   }
-  if (file.size > MAX_IMAGE_BYTES) return "Image must be 5 MB or smaller";
+  if (file.size > MAX_IMAGE_BYTES) return "Image must be 10 MB or smaller";
   return undefined;
 }

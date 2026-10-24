@@ -90,14 +90,15 @@ describe("loadConfig", () => {
     }
   });
 
-  it("reads R2 and summary settings, splitting the fallback model list", () => {
+  it("reads S3 and summary settings, splitting the fallback model list", () => {
     const config = loadConfig({
       ...required,
-      STORAGE_DRIVER: "r2",
-      R2_ACCOUNT_ID: "acct",
-      R2_ACCESS_KEY_ID: "key-id",
-      R2_SECRET_ACCESS_KEY: "key-secret",
-      R2_BUCKET: "photos",
+      STORAGE_DRIVER: "s3",
+      S3_ENDPOINT: "https://s3.example.test",
+      S3_REGION: "us-east-2",
+      S3_ACCESS_KEY_ID: "key-id",
+      S3_SECRET_ACCESS_KEY: "key-secret",
+      S3_BUCKET: "photos",
       SIGNED_URL_TTL_SECONDS: "300",
       OPENROUTER_API_KEY: "or-key",
       OPENROUTER_MODEL: "vendor/main:free",
@@ -105,8 +106,10 @@ describe("loadConfig", () => {
     });
 
     expect(config.storage).toEqual({
-      driver: "r2",
-      accountId: "acct",
+      driver: "s3",
+      endpoint: "https://s3.example.test",
+      region: "us-east-2",
+      forcePathStyle: true,
       accessKeyId: "key-id",
       secretAccessKey: "key-secret",
       bucket: "photos",
@@ -127,12 +130,12 @@ describe("loadConfig", () => {
     });
   });
 
-  it("will not select R2 without its credentials", () => {
-    const attempt = () => loadConfig({ ...required, STORAGE_DRIVER: "r2", R2_BUCKET: "photos" });
+  it("will not select S3 without its credentials", () => {
+    const attempt = () => loadConfig({ ...required, STORAGE_DRIVER: "s3", S3_BUCKET: "photos" });
 
-    expect(attempt).toThrow(/R2_ACCOUNT_ID/);
-    expect(attempt).toThrow(/R2_SECRET_ACCESS_KEY/);
-    expect(attempt).not.toThrow(/R2_BUCKET/);
+    expect(attempt).toThrow(/S3_ENDPOINT/);
+    expect(attempt).toThrow(/S3_SECRET_ACCESS_KEY/);
+    expect(attempt).not.toThrow(/S3_BUCKET/);
   });
 
   it("treats empty values as not set, so a copied .env.example works", () => {
@@ -146,7 +149,7 @@ describe("loadConfig", () => {
       OPENROUTER_MODEL: "",
       OPENROUTER_FALLBACK_MODELS: "",
       API_PUBLIC_URL: "",
-      R2_BUCKET: "",
+      S3_BUCKET: "",
       PORT: "",
       LOG_LEVEL: "",
     });

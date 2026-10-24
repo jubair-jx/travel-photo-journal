@@ -29,15 +29,23 @@ export interface Config {
 export type StorageConfig =
   | { driver: "local"; directory: string; publicBaseUrl: string; urlTtlSeconds: number }
   | {
-      driver: "r2";
-      accountId: string;
+      driver: "s3";
+      endpoint: string;
+      region: string;
+      forcePathStyle: boolean;
       accessKeyId: string;
       secretAccessKey: string;
       bucket: string;
       urlTtlSeconds: number;
     };
 
-const R2_KEYS = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"] as const;
+const S3_KEYS = [
+  "S3_ENDPOINT",
+  "S3_REGION",
+  "S3_ACCESS_KEY_ID",
+  "S3_SECRET_ACCESS_KEY",
+  "S3_BUCKET",
+] as const;
 
 // Comma-separated list from an env var; blanks and stray commas are ignored.
 const splitList = (value: string | undefined): string[] =>
@@ -74,15 +82,21 @@ const envSchema = z
     SMTP_USER: z.string().min(1).optional(),
     SMTP_PASS: z.string().min(1).optional(),
     MAIL_FROM: z.string().min(1).optional(),
-    STORAGE_DRIVER: z.enum(["local", "r2"]).default("local"),
+    STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
     LOCAL_STORAGE_DIR: z.string().min(1).default("./uploads"),
     // Where browsers reach this API; local file links are built from it.
     API_PUBLIC_URL: z.url().optional(),
     SIGNED_URL_TTL_SECONDS: z.coerce.number().int().min(30).max(86_400).default(900),
-    R2_ACCOUNT_ID: z.string().min(1).optional(),
-    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
-    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-    R2_BUCKET: z.string().min(1).optional(),
+    S3_ENDPOINT: z.url().optional(),
+    S3_REGION: z.string().min(1).optional(),
+    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    S3_BUCKET: z.string().min(1).optional(),
+    // Neon requires path-style addressing; R2 and AWS accept it too.
+    S3_FORCE_PATH_STYLE: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
     OPENROUTER_API_KEY: z.string().min(1).optional(),
     OPENROUTER_MODEL: z.string().min(1).optional(),
     OPENROUTER_FALLBACK_MODELS: z.string().optional(),
@@ -97,13 +111,13 @@ const envSchema = z
         }
       }
     }
-    if (env.STORAGE_DRIVER === "r2") {
-      for (const key of R2_KEYS) {
+    if (env.STORAGE_DRIVER === "s3") {
+      for (const key of S3_KEYS) {
         if (env[key] === undefined) {
           ctx.addIssue({
             code: "custom",
             path: [key],
-            message: 'Required when STORAGE_DRIVER is "r2"',
+            message: 'Required when STORAGE_DRIVER is "s3"',
           });
         }
       }
@@ -167,18 +181,21 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
 
 function buildStorageConfig(data: z.output<typeof envSchema>): StorageConfig {
   if (
-    data.STORAGE_DRIVER === "r2" &&
-    data.R2_ACCOUNT_ID &&
-    data.R2_ACCESS_KEY_ID &&
-    data.R2_SECRET_ACCESS_KEY &&
-    data.R2_BUCKET
+    data.STORAGE_DRIVER === "s3" &&
+    data.S3_ENDPOINT &&
+    data.S3_REGION &&
+    data.S3_ACCESS_KEY_ID &&
+    data.S3_SECRET_ACCESS_KEY &&
+    data.S3_BUCKET
   ) {
     return {
-      driver: "r2",
-      accountId: data.R2_ACCOUNT_ID,
-      accessKeyId: data.R2_ACCESS_KEY_ID,
-      secretAccessKey: data.R2_SECRET_ACCESS_KEY,
-      bucket: data.R2_BUCKET,
+      driver: "s3",
+      endpoint: data.S3_ENDPOINT,
+      region: data.S3_REGION,
+      forcePathStyle: data.S3_FORCE_PATH_STYLE,
+      accessKeyId: data.S3_ACCESS_KEY_ID,
+      secretAccessKey: data.S3_SECRET_ACCESS_KEY,
+      bucket: data.S3_BUCKET,
       urlTtlSeconds: data.SIGNED_URL_TTL_SECONDS,
     };
   }

@@ -133,7 +133,7 @@ describe("POST /photos: the image", () => {
     expect(await ctx.prisma.photo.count()).toBe(0);
   });
 
-  it("rejects an image over 5 MB", async () => {
+  it("rejects an image over 10 MB", async () => {
     const { auth } = await signedInUser();
 
     const res = await postPhoto(
@@ -145,7 +145,7 @@ describe("POST /photos: the image", () => {
     expect(res.status).toBe(413);
     expect(res.body).toEqual({
       success: false,
-      error: { code: "PAYLOAD_TOO_LARGE", message: "Image must be 5 MB or smaller" },
+      error: { code: "PAYLOAD_TOO_LARGE", message: "Image must be 10 MB or smaller" },
     });
     expect(ctx.storage.objects.size).toBe(0);
   });

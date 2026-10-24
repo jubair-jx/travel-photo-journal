@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 // Where the Next.js server forwards /api/* to. The browser only ever talks to its own origin, so
@@ -11,11 +10,7 @@ const apiOrigin = process.env["API_INTERNAL_URL"] ?? "http://localhost:4000";
 const standalone = process.env["NEXT_OUTPUT"] === "standalone";
 
 const nextConfig: NextConfig = {
-  ...(standalone && {
-    output: "standalone" as const,
-    // In a monorepo, dependencies live at the repository root; tracing must start there.
-    outputFileTracingRoot: fileURLToPath(new URL("../", import.meta.url)),
-  }),
+  ...(standalone && { output: "standalone" as const }),
   turbopack: {
     rules: {
       "*.css": {

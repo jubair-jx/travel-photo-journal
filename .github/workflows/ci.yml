@@ -13,11 +13,18 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # "prepare" installs git hooks, which CI has no use for.
+  HUSKY: "0"
+
 jobs:
-  verify:
-    name: Verify (format, lint, types, tests, build, audit)
+  backend:
+    name: Backend (format, lint, types, tests, build, audit)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
     services:
       postgres:
         image: postgres:16-alpine
@@ -39,9 +46,32 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          cache-dependency-path: backend/package-lock.json
       - run: npm ci
       # Lint and typecheck need the generated Prisma client, which is not committed.
-      - run: npm run prisma:generate -w backend
+      - run: npm run prisma:generate
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=high
+
+  frontend:
+    name: Frontend (format, lint, types, tests, build, audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
@@ -60,16 +90,14 @@ jobs:
       - name: Build API image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: backend/Dockerfile
+          context: backend
           push: false
           cache-from: type=gha,scope=api
           cache-to: type=gha,scope=api,mode=max
       - name: Build web image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: frontend/Dockerfile
+          context: frontend
           build-args: API_INTERNAL_URL=http://api:4000
           push: false
           cache-from: type=gha,scope=web

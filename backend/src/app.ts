@@ -80,7 +80,7 @@ export function createApp(deps: AppDeps): Express {
     ),
   );
 
-  // Only the development driver serves files itself; R2 links point straight at the bucket.
+  // Only the development driver serves files itself; S3 links point straight at the bucket.
   if (deps.storage instanceof LocalDiskStorage) {
     app.use("/files", createLocalFilesRouter(deps.storage));
   }

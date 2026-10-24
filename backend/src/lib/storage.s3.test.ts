@@ -2,21 +2,22 @@ import { randomUUID } from "node:crypto";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { describe, expect, it, vi } from "vitest";
 import { png } from "../test/fixtures.js";
-import { R2Storage } from "./storage.r2.js";
+import { S3Storage } from "./storage.s3.js";
 
 const key = `photos/${randomUUID()}/${randomUUID()}.png`;
 
 function build() {
   const client = new S3Client({
-    region: "auto",
-    endpoint: "https://acct123.r2.cloudflarestorage.com",
+    region: "us-east-2",
+    forcePathStyle: true,
+    endpoint: "https://s3.example.test",
     credentials: { accessKeyId: "dummy-access-key", secretAccessKey: "dummy-secret-key" },
   });
   const send = vi.spyOn(client, "send").mockResolvedValue({} as never);
-  return { storage: new R2Storage({ client, bucket: "journal-photos", urlTtlSeconds: 900 }), send };
+  return { storage: new S3Storage({ client, bucket: "journal-photos", urlTtlSeconds: 900 }), send };
 }
 
-describe("R2Storage", () => {
+describe("S3Storage", () => {
   it("uploads with the bucket, key, body and content type", async () => {
     const { storage, send } = build();
 
@@ -47,8 +48,8 @@ describe("R2Storage", () => {
 
     const url = new URL(await storage.getSignedUrl(key));
 
-    expect(url.host).toBe("journal-photos.acct123.r2.cloudflarestorage.com");
-    expect(url.pathname).toBe(`/${key}`);
+    expect(url.host).toBe("s3.example.test");
+    expect(url.pathname).toBe(`/journal-photos/${key}`);
     expect(url.searchParams.get("X-Amz-Expires")).toBe("900");
     expect(url.searchParams.get("X-Amz-Signature")).toMatch(/^[0-9a-f]{64}$/);
     expect(url.search).not.toContain("dummy-secret-key");

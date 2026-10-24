@@ -1,1 +1,6 @@
-npx lint-staged
+# Each package owns its tooling, so lint-staged runs inside whichever package has staged files.
+for pkg in backend frontend; do
+  if git diff --cached --name-only | grep -q "^$pkg/" && [ -d "$pkg/node_modules" ]; then
+    (cd "$pkg" && npx --no-install lint-staged) || exit 1
+  fi
+done

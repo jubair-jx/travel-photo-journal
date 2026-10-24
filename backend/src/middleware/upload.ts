@@ -3,7 +3,8 @@ import { fileTypeFromBuffer } from "file-type";
 import multer, { MulterError } from "multer";
 import { payloadTooLarge, unsupportedMediaType, validationError } from "../lib/errors.js";
 
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_IMAGE_MB = 10;
+export const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
 
 const ALLOWED = {
   "image/jpeg": "jpg",
@@ -40,7 +41,7 @@ export const acceptImage: RequestHandler = (req, res, next) => {
     if (error instanceof MulterError) {
       next(
         error.code === "LIMIT_FILE_SIZE"
-          ? payloadTooLarge("Image must be 5 MB or smaller")
+          ? payloadTooLarge(`Image must be ${MAX_IMAGE_MB} MB or smaller`)
           : validationError([{ path: error.field ?? "image", message: "Unexpected file upload" }]),
       );
       return;
