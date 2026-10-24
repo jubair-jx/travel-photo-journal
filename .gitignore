@@ -26,3 +26,6 @@ AGENTS.md
 docs/learn/
 docs/agents/
 next-env.d.ts
+
+# prisma client output
+backend/src/generated/

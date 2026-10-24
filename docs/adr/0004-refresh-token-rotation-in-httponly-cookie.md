@@ -7,3 +7,7 @@ This keeps long-lived credentials out of JavaScript (an XSS bug cannot read the 
 Rejected: tokens in localStorage (readable by any injected script), server-side sessions checked on every request (a database hit per call), and one long-lived JWT (cannot be revoked).
 
 Consequence: a page reload loses the in-memory access token, so the client silently calls the refresh endpoint on load and on any 401.
+
+## Cookie attributes
+
+httpOnly always; Secure in production only (development runs over plain http, where a Secure cookie would not be stored by every browser); `SameSite=Lax`; path set by `REFRESH_COOKIE_PATH` because the browser sees `/api/auth/...` behind the proxy. Lax rather than Strict so that arriving from a link in an email still carries the session, while cross-site POSTs (the only way to forge refresh or logout) are still blocked. Rotation details are in ADR-0009.

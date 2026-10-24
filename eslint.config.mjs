@@ -9,7 +9,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       "**/coverage/**",
-      "apps/web/**",
+      "frontend/**",
       "**/src/generated/**",
     ],
   },
@@ -23,6 +23,8 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/consistent-type-imports": "error",
+      // Express recognises error handlers by their four-argument arity.
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
     },
   },

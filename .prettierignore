@@ -3,4 +3,4 @@ dist
 .next
 coverage
 package-lock.json
-apps/api/src/generated
+backend/src/generated
