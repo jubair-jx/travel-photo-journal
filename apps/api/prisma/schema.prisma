@@ -18,6 +18,7 @@ model User {
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   emailVerificationTokens EmailVerificationToken[]
+  refreshTokens           RefreshToken[]
 
   @@map("users")
 }
@@ -34,4 +35,23 @@ model EmailVerificationToken {
 
   @@index([userId])
   @@map("email_verification_tokens")
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  tokenHash    String    @unique @map("token_hash")
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+  // The token issued when this one was rotated; following these links walks a session forward.
+  replacedById String?   @map("replaced_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBy   RefreshToken?  @relation("Rotation", fields: [replacedById], references: [id], onDelete: SetNull)
+  replacements RefreshToken[] @relation("Rotation")
+
+  @@index([userId])
+  @@index([replacedById])
+  @@map("refresh_tokens")
 }
