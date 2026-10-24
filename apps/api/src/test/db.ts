@@ -10,6 +10,7 @@ export function createTestPrisma(): PrismaClient {
 
 // Children first: foreign keys would reject deleting a user that still owns rows.
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
+  await prisma.photo.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.emailVerificationToken.deleteMany();
   await prisma.user.deleteMany();
