@@ -183,6 +183,9 @@ export const api = createApi({
       query: ({ id, body }) => ({ url: `/photos/${id}`, method: "PUT", body }),
       invalidatesTags: ["Photo"],
     }),
+    describePhoto: build.mutation<{ description: string }, FormData>({
+      query: (body) => ({ url: "/photos/describe", method: "POST", body }),
+    }),
     deletePhoto: build.mutation<null, string>({
       query: (id) => ({ url: `/photos/${id}`, method: "DELETE" }),
       invalidatesTags: ["Photo"],
@@ -207,4 +210,5 @@ export const {
   useCreatePhotoMutation,
   useUpdatePhotoMutation,
   useDeletePhotoMutation,
+  useDescribePhotoMutation,
 } = api;

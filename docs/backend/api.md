@@ -261,6 +261,16 @@ Creates a photo. `multipart/form-data` with the fields `image` (file), `name`, `
 
 A `summary` sent by the client is ignored. The server generates one from the description (summary generation via OpenRouter); if that fails or is switched off, the photo is still saved with `summary: null`.
 
+### POST /photos/describe
+
+Drafts a description from a picture, for the add-photo form. Nothing is stored: the user reads and edits the draft, and it is only kept if they save the photo.
+
+- **Auth:** bearer access token. Rate limited to 30 per hour per client, since each call is a paid model request.
+- **Body:** multipart with `image` (same rules as `POST /photos`, and at most 5 MB because of the model's limit; the web app sends a 1024 px JPEG copy) and optional `name` and `location` as context.
+- **200:** `{ "success": true, "data": { "description": string } }`.
+- **400** without an image, **415** for a file that is not a JPEG, PNG or WebP.
+- **503 `AI_UNAVAILABLE`:** the feature is not configured or the model call failed. The client falls back to writing the description by hand.
+
 ### GET /photos
 
 Lists the caller's photos, newest first.

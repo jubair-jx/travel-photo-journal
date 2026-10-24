@@ -62,6 +62,10 @@ export const payloadTooLarge = (message = "Request body is too large"): AppError
 export const unsupportedMediaType = (message: string): AppError =>
   new AppError(415, "UNSUPPORTED_MEDIA_TYPE", message);
 
+// 503: the feature is optional and temporarily (or by configuration) not available.
+export const aiUnavailable = (): AppError =>
+  new AppError(503, "AI_UNAVAILABLE", "AI descriptions are not available right now");
+
 export const sessionNotFound = (): AppError => notFound("Session not found");
 
 export const photoNotFound = (): AppError => notFound("Photo not found");

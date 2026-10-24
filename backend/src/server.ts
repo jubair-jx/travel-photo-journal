@@ -5,6 +5,7 @@ import { createLogger } from "./lib/logger.js";
 import { createSmtpMailer } from "./lib/mailer.js";
 import { createPrismaClient } from "./lib/prisma.js";
 import { createStorage } from "./lib/storage.factory.js";
+import { createDescriber } from "./lib/describer.js";
 import { createSummarizer } from "./lib/summarizer.js";
 
 function main(): void {
@@ -19,6 +20,11 @@ function main(): void {
     mailer,
     storage: createStorage(config),
     summarizer: createSummarizer(config.summary),
+    describer: createDescriber({
+      ...(config.summary.anthropic && { anthropic: config.summary.anthropic }),
+      // An image takes longer than text, so a longer deadline than summaries.
+      deadlineMs: 15_000,
+    }),
   }).listen(config.port, () => {
     logger.info({ port: config.port, env: config.nodeEnv }, "api listening");
   });

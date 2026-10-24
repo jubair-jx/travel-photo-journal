@@ -8,6 +8,7 @@ import { createAccessTokenService } from "./lib/jwt.js";
 import type { Mailer } from "./lib/mailer.js";
 import type { StorageService } from "./lib/storage.js";
 import { createLocalFilesRouter, LocalDiskStorage } from "./lib/storage.local.js";
+import type { Describer } from "./lib/describer.js";
 import type { Summarizer } from "./lib/summarizer.js";
 import type { PrismaClient } from "./lib/prisma.js";
 import { sendSuccess } from "./lib/response.js";
@@ -31,6 +32,7 @@ export interface AppDeps {
   mailer: Mailer;
   storage: StorageService;
   summarizer: Summarizer;
+  describer: Describer;
   authRateLimits?: AuthRateLimits;
 }
 
@@ -74,6 +76,7 @@ export function createApp(deps: AppDeps): Express {
         prisma: deps.prisma,
         storage: deps.storage,
         summarizer: deps.summarizer,
+        describer: deps.describer,
         logger: deps.logger,
       }),
       accessTokens,

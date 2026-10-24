@@ -12,6 +12,7 @@ import { createUser } from "../../test/factories.js";
 import { png } from "../../test/fixtures.js";
 import { FakeMailer } from "../../test/fake-mailer.js";
 import { FakeSummarizer } from "../../test/fake-summarizer.js";
+import { FakeDescriber } from "../../test/fake-describer.js";
 import { createTestPrisma } from "../../test/db.js";
 import { testConfig } from "../../test/helpers.js";
 
@@ -38,6 +39,7 @@ beforeAll(async () => {
     mailer: new FakeMailer(),
     storage: createStorage(config),
     summarizer: new FakeSummarizer(),
+    describer: new FakeDescriber(),
   });
 });
 
