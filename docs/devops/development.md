@@ -7,7 +7,7 @@ Node.js 22 (see `.nvmrc`), npm, and Docker (for Postgres and, optionally, the wh
 ## Option A: the whole stack in Docker
 
 ```bash
-cp .env.example .env        # then fill in JWT_SECRET and TOTP_ENC_KEY (commands are in the file)
+cp backend/.env.example backend/.env   # then fill in JWT_SECRET and TOTP_ENC_KEY (commands are in the file)
 docker compose up --build
 ```
 
@@ -74,7 +74,7 @@ Web: `API_INTERNAL_URL` (default `http://localhost:4000`) is where the Next.js s
 ## Troubleshooting
 
 - **Tests crash with `TypeError: code.charCodeAt is not a function`.** This is a Vitest error-printing bug that hides the real cause, almost always the test database being unreachable. Run `docker compose up -d postgres` and retry.
-- **`docker compose up` says a variable is missing.** Create the root `.env` from `.env.example` and fill in the two secrets.
+- **`docker compose up` says a variable is missing.** Create `backend/.env` from `backend/.env.example` and fill in the two secrets; compose reads it.
 - **The migrate service fails.** `docker compose logs migrate` shows why; typically Postgres was not ready or the volume holds a database from an older schema (`docker compose down -v` resets it).
 - **Typecheck or lint reports errors about `generated/prisma`.** Run `cd backend && npm run prisma:generate`; the Prisma client is generated, not committed.
 - **Images do not load in the browser (local driver).** `API_PUBLIC_URL` must be an address the browser can reach: `http://localhost:3000/api` when going through the web app.

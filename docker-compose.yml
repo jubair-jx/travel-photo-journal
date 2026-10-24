@@ -6,7 +6,8 @@
 #   web       http://localhost:3000 (proxies /api/* to the API)
 #
 # For tests only, `docker compose up -d postgres` is enough.
-# Secrets come from a root .env file (see .env.example); compose refuses to start without them.
+# Secrets (JWT_SECRET, TOTP_ENC_KEY, OPENROUTER_*) come from backend/.env (see backend/.env.example).
+# Settings below override that file so the stack always runs against the local containers.
 
 name: travel-photo-journal
 
@@ -53,6 +54,9 @@ services:
 
   api:
     <<: *api-image
+    env_file:
+      - path: backend/.env
+        required: false
     environment:
       # Plain http on localhost: a Secure-only cookie would not be stored by every browser.
       NODE_ENV: development
@@ -63,14 +67,9 @@ services:
       API_PUBLIC_URL: http://localhost:3000/api
       TRUST_PROXY: "1"
       DATABASE_URL: postgresql://tpj:tpj@postgres:5432/tpj_dev
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (see .env.example)}
-      TOTP_ENC_KEY: ${TOTP_ENC_KEY:?Set TOTP_ENC_KEY in .env (see .env.example)}
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       STORAGE_DRIVER: local
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
-      OPENROUTER_FALLBACK_MODELS: ${OPENROUTER_FALLBACK_MODELS:-}
     ports:
       - "4000:4000"
     volumes:
