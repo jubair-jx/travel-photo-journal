@@ -80,7 +80,7 @@ Requirements: Node.js 22, npm, Docker.
 **Everything in Docker** (database, migrations, mail catcher, API and web app):
 
 ```bash
-cp .env.example .env        # fill in JWT_SECRET and TOTP_ENC_KEY (commands are in the file)
+cp backend/.env.example backend/.env   # fill in JWT_SECRET and TOTP_ENC_KEY (commands are in the file)
 docker compose up --build
 ```
 
