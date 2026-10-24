@@ -24,6 +24,7 @@ export function LocationField({ label, value, onChange, onBlur, error }: Locatio
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [searching, setSearching] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   // Set when a suggestion is chosen, so the follow-up value change does not search again.
   const skipSearch = useRef(false);
 
@@ -41,11 +42,14 @@ export function LocationField({ label, value, onChange, onBlur, error }: Locatio
       searchPlaces(query, controller.signal)
         .then((places) => {
           setResults(places);
+          setUnavailable(false);
           setActive(-1);
         })
         .catch(() => {
-          // Aborted or offline: no suggestions, and typing still works.
-          if (!controller.signal.aborted) setResults([]);
+          // Rate limited or offline: say so, and typing still works.
+          if (controller.signal.aborted) return;
+          setResults([]);
+          setUnavailable(true);
         })
         .finally(() => {
           if (!controller.signal.aborted) setSearching(false);
@@ -68,21 +72,25 @@ export function LocationField({ label, value, onChange, onBlur, error }: Locatio
 
   // Results from a longer, earlier query are hidden as soon as the text gets too short.
   const suggestions = value.trim().length >= MIN_QUERY ? results : [];
-  const expanded = open && suggestions.length > 0;
+  const typed = value.trim();
+  // The last option is always the text exactly as typed, so a place nobody suggests is still one click away.
+  const manualIndex = suggestions.length;
+  const optionCount = suggestions.length + 1;
+  const expanded = open && typed.length >= MIN_QUERY;
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "ArrowDown" && suggestions.length > 0) {
+    if (event.key === "ArrowDown" && typed.length >= MIN_QUERY) {
       event.preventDefault();
       setOpen(true);
-      setActive((index) => (index + 1) % suggestions.length);
-    } else if (event.key === "ArrowUp" && suggestions.length > 0) {
+      setActive((index) => (index + 1) % optionCount);
+    } else if (event.key === "ArrowUp" && typed.length >= MIN_QUERY) {
       event.preventDefault();
       setOpen(true);
-      setActive((index) => (index <= 0 ? suggestions.length - 1 : index - 1));
+      setActive((index) => (index <= 0 ? optionCount - 1 : index - 1));
     } else if (event.key === "Enter" && expanded && active >= 0) {
       // Pick the highlighted place instead of submitting the form.
       event.preventDefault();
-      const place = suggestions[active];
+      const place = active === manualIndex ? typed : suggestions[active];
       if (place) choose(place);
     } else if (event.key === "Escape" && expanded) {
       // Close the list only; the dialog's own Escape handling should not fire.
@@ -167,12 +175,38 @@ export function LocationField({ label, value, onChange, onBlur, error }: Locatio
               {place}
             </li>
           ))}
-          <li aria-hidden="true" className="px-3 pt-1.5 pb-1 text-[11px] text-slate-500">
+          {unavailable && (
+            <li role="presentation" className="px-3 py-2 text-xs text-amber-300">
+              Suggestions are unavailable right now. Type your location yourself.
+            </li>
+          )}
+          <li
+            id={`${id}-option-${manualIndex}`}
+            role="option"
+            aria-selected={active === manualIndex}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              choose(typed);
+            }}
+            onMouseEnter={() => setActive(manualIndex)}
+            className={cn(
+              "cursor-pointer rounded-xl px-3 py-2 text-sm text-slate-200",
+              active === manualIndex && "bg-white/10 text-white",
+            )}
+          >
+            Use &ldquo;{typed}&rdquo; as typed
+          </li>
+          <li role="presentation" className="px-3 pt-1.5 pb-1 text-[11px] text-slate-500">
             Suggestions from OpenStreetMap
           </li>
         </ul>
       )}
 
+      {!error && (
+        <p className="mt-1 text-xs text-slate-400">
+          Pick a suggestion, or just type your own location.
+        </p>
+      )}
       {error && (
         <p id={`${id}-error`} role="alert" className="mt-1 text-sm text-red-400">
           {error}

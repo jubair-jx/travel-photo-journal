@@ -40,9 +40,9 @@ describe("searchPlaces", () => {
     expect(labels).toEqual(["Kyoto, Japan", "Kyoto, Kyoto Prefecture, Japan"]);
   });
 
-  it("returns no suggestions when the service errors", async () => {
+  it("rejects when the service errors, so the caller can fall back to manual entry", async () => {
     respond({}, false);
 
-    await expect(searchPlaces("kyo", new AbortController().signal)).resolves.toEqual([]);
+    await expect(searchPlaces("kyo", new AbortController().signal)).rejects.toThrow(/failed/);
   });
 });
