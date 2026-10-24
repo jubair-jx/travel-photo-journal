@@ -203,8 +203,8 @@ The domain vocabulary is in the [glossary](docs/CONTEXT.md); product requirement
 
 ## What I would improve with more time
 
-- **Sessions:** a device list with per-device sign-out, an absolute session lifetime, a short grace window so two tabs refreshing at once do not end the session, and periodic cleanup of expired tokens.
-- **Two-factor:** replay protection for codes, recovery codes, and a way to turn it off or re-enrol.
+- **Sessions:** an absolute session lifetime, a short grace window so two tabs refreshing at once do not end the session, and periodic cleanup of expired tokens.
+- **Two-factor:** replay protection for codes, and recovery codes.
 - **Summaries:** generate them in a background queue instead of during the request, which removes the extra latency when the provider is slow.
 - **Images:** resize and re-encode on upload (thumbnails, stripping metadata), and virus scanning.
 - **Operations:** a readiness check that includes the database, structured metrics and tracing, error reporting, and a cleanup job for files left behind if an account is deleted.
