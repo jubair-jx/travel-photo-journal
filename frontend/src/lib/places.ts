@@ -1,5 +1,5 @@
 // Place suggestions for the location field, from the public Photon geocoder (OpenStreetMap data).
-// It is a convenience only: the field accepts any text, and a failed lookup just shows no list.
+// It is a convenience only: the field accepts any text, and a failed lookup falls back to typing.
 const ENDPOINT = "https://photon.komoot.io/api/";
 const LAYERS = ["city", "locality", "district", "county", "state", "country"];
 
@@ -31,7 +31,8 @@ export async function searchPlaces(query: string, signal: AbortSignal): Promise<
   for (const layer of LAYERS) url.searchParams.append("layer", layer);
 
   const response = await fetch(url, { signal });
-  if (!response.ok) return [];
+  // Throws on 429 or any other failure, so the field can tell "no matches" from "unavailable".
+  if (!response.ok) throw new Error(`Place search failed with status ${response.status}`);
   const body = (await response.json()) as PhotonResponse;
 
   const labels = (body.features ?? []).flatMap((feature) => {
