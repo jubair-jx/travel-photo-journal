@@ -52,7 +52,22 @@ Prisma 7 reads `DIRECT_URL` from `prisma.config.ts`; the schema file contains no
 
 A session is the chain of rows linked by `replaced_by_id`. Rotation is a conditional UPDATE (`revoked_at IS NULL AND expires_at > now`) followed by creating the successor, in one transaction. See ADR-0009.
 
-Later slices add `photos`.
+### photos
+
+| Column        | Type              | Notes                                                                          |
+| ------------- | ----------------- | ------------------------------------------------------------------------------ |
+| `id`          | uuid, PK          |                                                                                |
+| `user_id`     | uuid, FK to users | `ON DELETE CASCADE`                                                            |
+| `name`        | text              | 1 to 120 characters (enforced by the input schema)                             |
+| `location`    | text              | 1 to 120 characters                                                            |
+| `description` | text              | 1 to 2000 characters                                                           |
+| `summary`     | text?             | Server-generated from the description; null when unavailable                   |
+| `image_key`   | text              | Storage object key `photos/<user id>/<random id>.<ext>`; never sent to clients |
+| `image_mime`  | text              | Detected from the file's bytes                                                 |
+| `created_at`  | timestamptz       | Default now                                                                    |
+| `updated_at`  | timestamptz       | Maintained by Prisma                                                           |
+
+The index on (`user_id`, `created_at`) serves the list query (a user's photos, newest first). Every query that touches a photo filters on both `id` and `user_id` (ADR-0007). Deleting a user cascades to their rows but not to files in storage; there is no account-deletion feature yet.
 
 ## Design notes
 
@@ -73,3 +88,5 @@ Later slices add `photos`.
 | Migration                            | Contents                             |
 | ------------------------------------ | ------------------------------------ |
 | `init_users_and_verification_tokens` | `users`, `email_verification_tokens` |
+| `add_refresh_tokens`                 | `refresh_tokens`                     |
+| `add_photos`                         | `photos`                             |

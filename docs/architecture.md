@@ -53,6 +53,14 @@ Each module owns its HTTP surface and business logic:
 
 Prisma is the only database access (pooled URL at runtime, direct URL for migrations; see database.md). Outbound email goes through the `Mailer` interface; the SMTP implementation targets Mailpit locally and Brevo in production, and tests substitute a recording fake.
 
+`photos` provides create, list, read, update and delete for a user's own photos; its service takes the storage and summarizer interfaces as dependencies.
+
+## Storage and summaries
+
+`StorageService` (upload, delete, getSignedUrl) has two drivers selected by `STORAGE_DRIVER`: local disk for development and tests (files served by the API through HMAC-signed, expiring links) and Cloudflare R2 for production (presigned GET links). `Summarizer` has an OpenRouter implementation that tries the configured model and then the fallback list inside one 8-second deadline, and a disabled implementation used when no API key or model is configured, so the whole application runs without any external credentials.
+
+The upload pipeline is: multer (memory, 5 MB, one file), then a magic-byte check, then the service. Create runs summarization and the storage upload concurrently and inserts one row; if the insert fails the uploaded object is removed.
+
 ## Testing approach
 
 Vitest and supertest drive the app through HTTP. Infrastructure modules are tested through their public interface (a throwaway Express app for middleware, a captured stream for the logger). Integration tests run against a real Postgres (compose locally, a service container in CI); global setup migrates it, and each test resets the tables through Prisma. The mailer is replaced by a fake that records messages, so tests read verification links the way a user would. Selected tests were mutation-checked (breaking the code on purpose) to confirm they fail when the behavior breaks.

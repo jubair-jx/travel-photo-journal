@@ -180,3 +180,76 @@ Before 2FA is confirmed, login behaves exactly as before.
 | 400    | `INVALID_TOTP_CODE`          | Setup confirmation code does not match.       |
 | 400    | `TWO_FACTOR_NOT_SET_UP`      | Confirming before calling setup.              |
 | 409    | `TWO_FACTOR_ALREADY_ENABLED` | Setup or confirmation when 2FA is already on. |
+
+## Photos
+
+All photo routes require `Authorization: Bearer <accessToken>` and only ever touch the caller's own photos. A photo that belongs to someone else, does not exist, or has a malformed id gets the same `404 NOT_FOUND` ("Photo not found"), so existence is never revealed (ADR-0007).
+
+### Photo object
+
+```json
+{
+  "id": "uuid",
+  "name": "Sunrise at Phewa Lake",
+  "location": "Pokhara, Nepal",
+  "description": "We paddled out before dawn...",
+  "summary": "A short generated summary.",
+  "imageUrl": "https://... (signed, expires)",
+  "imageMime": "image/png",
+  "createdAt": "2026-10-24T14:00:00.000Z",
+  "updatedAt": "2026-10-24T14:00:00.000Z"
+}
+```
+
+`summary` is `null` when it could not be produced. `imageUrl` is a short-lived signed link (15 minutes by default); fetch the photo or list again to get a fresh one. The storage key is never exposed.
+
+### POST /photos
+
+Creates a photo. `multipart/form-data` with the fields `image` (file), `name`, `location`, `description`.
+
+- **Limits:** `name` and `location` 1 to 120 characters, `description` 1 to 2000, all trimmed. Image: JPEG, PNG or WebP, at most 5 MB.
+- **201:** the photo object.
+- **400 `VALIDATION_ERROR`:** a text field is missing or too long, the image is missing, or a file was sent under a field other than `image`. `details` lists each failing `path`.
+- **413 `PAYLOAD_TOO_LARGE`:** the image is over 5 MB.
+- **415 `UNSUPPORTED_MEDIA_TYPE`:** the file is not a JPEG, PNG or WebP. The decision is made from the file's own bytes; the filename and `Content-Type` the client sends are ignored.
+- **401 `UNAUTHENTICATED`**
+
+A `summary` sent by the client is ignored. The server generates one from the description (summary generation via OpenRouter); if that fails or is switched off, the photo is still saved with `summary: null`.
+
+### GET /photos
+
+Lists the caller's photos, newest first.
+
+- **Query:** `page` (default 1) and `limit` (default 20, maximum 50).
+- **200:** `{ "items": [photo], "page": 1, "limit": 20, "total": 42, "totalPages": 3 }`. A page past the end returns an empty `items`.
+- **400 `VALIDATION_ERROR`:** a non-numeric or out-of-range `page` or `limit`.
+
+### GET /photos/:id
+
+- **200:** the photo object. **404** if it is not the caller's.
+
+### PUT /photos/:id
+
+Replaces `name`, `location` and `description` (all three required) and optionally the image. `multipart/form-data` like create, with `image` optional.
+
+- **200:** the updated photo.
+- The summary is regenerated only if the description changed. If regeneration fails it becomes `null` instead of keeping a summary of the old text. An unchanged description keeps the existing summary.
+- A replaced image's old file is deleted after the new one is saved.
+- **400**, **413**, **415** as for create; a rejected request changes nothing. **404** if not the caller's; in that case nothing is uploaded or summarized.
+
+### DELETE /photos/:id
+
+- **200:** `{ "success": true, "data": null }`. Deletes the row and then the stored file; if the file cannot be removed the request still succeeds and the failure is logged.
+- **404** if not the caller's. Repeating the request gives 404.
+
+### GET /files/photos/... (development driver only)
+
+When `STORAGE_DRIVER=local`, the API serves image bytes itself at the URLs it hands out: `GET /files/<key>?expires=<unix>&signature=<hmac>`. Anything that is not a valid, unexpired link gets `403 INVALID_LINK`; a valid link to a missing file gets 404. With `STORAGE_DRIVER=r2` the links point straight at the bucket and this route does not exist.
+
+## Error codes added (photos)
+
+| Status | Code                     | When                                                   |
+| ------ | ------------------------ | ------------------------------------------------------ |
+| 413    | `PAYLOAD_TOO_LARGE`      | Image over 5 MB (JSON bodies over 100 KB also use it). |
+| 415    | `UNSUPPORTED_MEDIA_TYPE` | Upload is not a JPEG, PNG or WebP.                     |
+| 403    | `INVALID_LINK`           | Local-driver image link is tampered with or expired.   |
