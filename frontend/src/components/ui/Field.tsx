@@ -84,7 +84,7 @@ export function TextField({ label, error, hint, className, type, ...props }: Tex
             onClick={() => setRevealed((value) => !value)}
             aria-label={revealed ? "Hide password" : "Show password"}
             aria-pressed={revealed}
-            className="absolute inset-y-0 right-0 flex items-center rounded-r-xl px-3 text-slate-400 transition hover:text-white focus-visible:text-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-orange-400"
+            className="absolute inset-y-0 right-0 flex cursor-pointer items-center rounded-r-xl px-3 text-slate-400 transition hover:text-white focus-visible:text-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-orange-400"
           >
             <EyeIcon off={revealed} />
           </button>

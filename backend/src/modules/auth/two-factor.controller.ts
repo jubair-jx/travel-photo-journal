@@ -2,7 +2,7 @@ import type { RequestHandler } from "express";
 import type { ParamsDictionary } from "express-serve-static-core";
 import { sendSuccess } from "../../lib/response.js";
 import { authenticatedUserId } from "../../middleware/auth.js";
-import type { VerifyTwoFactorInput } from "./auth.schema.js";
+import type { DisableTwoFactorInput, VerifyTwoFactorInput } from "./auth.schema.js";
 import type { TwoFactorService } from "./two-factor.service.js";
 
 export function createTwoFactorController(service: TwoFactorService) {
@@ -17,5 +17,16 @@ export function createTwoFactorController(service: TwoFactorService) {
     sendSuccess(res, await service.confirm(authenticatedUserId(req), req.body.code));
   };
 
-  return { setup, confirm };
+  const status: RequestHandler = async (req, res) => {
+    sendSuccess(res, await service.status(authenticatedUserId(req)));
+  };
+
+  const disable: RequestHandler<ParamsDictionary, unknown, DisableTwoFactorInput> = async (
+    req,
+    res,
+  ) => {
+    sendSuccess(res, await service.disable(authenticatedUserId(req), req.body));
+  };
+
+  return { setup, confirm, status, disable };
 }

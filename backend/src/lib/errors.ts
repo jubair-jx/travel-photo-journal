@@ -49,6 +49,13 @@ export const twoFactorNotSetUp = (): AppError =>
 export const invalidTotpCode = (): AppError =>
   new AppError(400, "INVALID_TOTP_CODE", "That code is not valid");
 
+export const twoFactorNotEnabled = (): AppError =>
+  new AppError(409, "TWO_FACTOR_NOT_ENABLED", "Two-factor authentication is not enabled");
+
+// 403, not 401: the caller is signed in; this is a failed re-confirmation, not an expired session.
+export const incorrectPassword = (): AppError =>
+  new AppError(403, "INCORRECT_PASSWORD", "That password is not correct");
+
 export const payloadTooLarge = (message = "Request body is too large"): AppError =>
   new AppError(413, "PAYLOAD_TOO_LARGE", message);
 

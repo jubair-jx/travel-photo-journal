@@ -2,12 +2,13 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { TextAreaField, TextField } from "@/components/ui/Field";
+import { LocationField } from "@/components/ui/LocationField";
 import { applyFieldIssues, isApiError } from "@/lib/errors";
 import { photoFieldsSchema, validateImage, type PhotoFieldValues } from "@/lib/schemas";
 import type { Photo } from "@/lib/types";
@@ -32,6 +33,7 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
 
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors },
@@ -91,7 +93,19 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
     <form onSubmit={handleSubmit(submit)} noValidate className="space-y-4">
       {failure && <Alert>{failure}</Alert>}
       <TextField label="Name" error={errors.name?.message} {...register("name")} />
-      <TextField label="Location" error={errors.location?.message} {...register("location")} />
+      <Controller
+        control={control}
+        name="location"
+        render={({ field }) => (
+          <LocationField
+            label="Location"
+            value={field.value}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
+            error={errors.location?.message}
+          />
+        )}
+      />
       <TextAreaField
         label="Description"
         rows={4}
@@ -122,7 +136,7 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
             setFile(chosen);
             setImageError(validateImage(chosen, !editing));
           }}
-          className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-200 hover:file:bg-white/20"
+          className="block w-full text-sm text-slate-300 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-200 hover:file:bg-white/20"
         />
         {editing && !imageError && (
           <p className="mt-1 text-xs text-slate-400">Leave empty to keep the current image.</p>

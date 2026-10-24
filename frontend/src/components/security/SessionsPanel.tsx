@@ -90,7 +90,7 @@ export function SessionsPanel() {
   };
 
   return (
-    <Card className="mt-6 max-w-xl space-y-5">
+    <Card className="space-y-5">
       <div>
         <h2 className="font-display text-2xl font-semibold text-white">Signed-in devices</h2>
         <p className="mt-1 text-sm text-slate-300">

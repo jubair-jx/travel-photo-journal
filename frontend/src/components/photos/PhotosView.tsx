@@ -11,6 +11,7 @@ import { useListPhotosQuery } from "@/store/api";
 import { DeletePhotoDialog } from "./DeletePhotoDialog";
 import { PhotoCard } from "./PhotoCard";
 import { PhotoFormDialog } from "./PhotoFormDialog";
+import { PhotoViewerDialog } from "./PhotoViewerDialog";
 
 function SkeletonGrid() {
   return (
@@ -39,6 +40,7 @@ const REFRESH_COOLDOWN_MS = 30_000;
 export function PhotosView() {
   const [page, setPage] = useState(1);
   const { data, error, isLoading, isFetching, refetch } = useListPhotosQuery({ page });
+  const [viewing, setViewing] = useState<Photo | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Photo | undefined>();
   const [deleting, setDeleting] = useState<Photo | null>(null);
@@ -121,6 +123,7 @@ export function PhotosView() {
                 <PhotoCard
                   key={photo.id}
                   photo={photo}
+                  onOpen={setViewing}
                   onEdit={setEditing}
                   onDelete={setDeleting}
                   onImageError={refreshLinks}
@@ -148,6 +151,19 @@ export function PhotosView() {
         </>
       )}
 
+      <PhotoViewerDialog
+        photo={viewing}
+        onClose={() => setViewing(null)}
+        onEdit={(photo) => {
+          setViewing(null);
+          setEditing(photo);
+        }}
+        onDelete={(photo) => {
+          setViewing(null);
+          setDeleting(photo);
+        }}
+        onImageError={refreshLinks}
+      />
       <PhotoFormDialog open={adding} onClose={() => setAdding(false)} />
       <PhotoFormDialog
         open={editing !== undefined}
