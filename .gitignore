@@ -1,0 +1,28 @@
+node_modules/
+dist/
+.next/
+coverage/
+*.tsbuildinfo
+
+# env
+.env
+.env.*
+!.env.example
+
+# local storage + logs
+uploads/
+*.log
+
+# editor / os
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# private tooling and study notes
+.claude/
+CLAUDE.md
+AGENTS.md
+docs/learn/
+docs/agents/
+next-env.d.ts
