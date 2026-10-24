@@ -24,7 +24,7 @@ A private journal for travel photos. Register, verify your email, sign in (optio
 | Validation | Zod on every input                                                        | One definition of what each endpoint accepts; unknown fields are dropped (which is also how a client-supplied summary is ignored).                                                                                 |
 | Passwords  | argon2id                                                                  | Memory-hard, recommended by OWASP ([ADR-0003](docs/adr/0003-argon2id-for-password-hashing.md)).                                                                                                                    |
 | Sessions   | 15-minute JWT (HS256) plus a rotating refresh token in an httpOnly cookie | Limits what a stolen access token is worth while keeping long sessions revocable ([ADR-0004](docs/adr/0004-refresh-token-rotation-in-httponly-cookie.md), [ADR-0009](docs/adr/0009-refresh-session-mechanics.md)). |
-| Images     | Cloudflare R2 (private bucket) behind a storage interface                 | No public URLs, cheap egress, and a local-disk driver for development and tests ([ADR-0005](docs/adr/0005-r2-behind-a-storage-interface.md)).                                                                      |
+| Images     | Neon Object Storage (private, S3-compatible) behind a storage interface   | No public URLs, cheap egress, and a local-disk driver for development and tests ([ADR-0005](docs/adr/0005-r2-behind-a-storage-interface.md)).                                                                      |
 | Email      | SMTP via nodemailer: Brevo in production, Mailpit locally                 | A real relay with a free tier, and a mail catcher so nothing external is needed in development.                                                                                                                    |
 | Web        | Next.js (App Router), Tailwind CSS, Framer Motion                         | Simple pages, utility-class styling, light motion that respects reduced-motion settings.                                                                                                                           |
 | Web data   | Redux Toolkit with RTK Query; react-hook-form and zod                     | Caching and one place for auth, errors and silent refresh ([ADR-0011](docs/adr/0011-web-client-state-and-session.md)).                                                                                             |
@@ -44,7 +44,7 @@ flowchart LR
   Browser["Browser"] -->|"HTTPS"| Web["Next.js web app<br/>(Vercel)"]
   Web -->|"/api/* rewrite"| API["Express API<br/>(Railway, Docker)"]
   API -->|"Prisma, pooled"| DB[("Neon Postgres")]
-  API -->|"S3 API, signed URLs"| R2[("Cloudflare R2<br/>private bucket")]
+  API -->|"S3 API, signed URLs"| R2[("Neon Object Storage<br/>private bucket")]
   API -->|"SMTP"| Mail["Brevo"]
   API -->|"HTTPS, 8 s deadline"| Summaries["OpenRouter"]
   Browser -.->|"signed image links"| R2
@@ -90,10 +90,10 @@ Open <http://localhost:3000>. Emails sent by the app (such as the verification l
 
 ```bash
 docker compose up -d postgres mailpit
-npm ci
+(cd backend && npm ci) && (cd frontend && npm ci)
 cp backend/.env.example backend/.env     # fill in the values
-npm run dev:backend                             # http://localhost:4000
-npm run dev:frontend                             # http://localhost:3000
+(cd backend && npm run dev)  # http://localhost:4000
+(cd frontend && npm run dev) # http://localhost:3000
 ```
 
 More, including troubleshooting: [docs/devops/development.md](docs/devops/development.md).
@@ -102,35 +102,36 @@ More, including troubleshooting: [docs/devops/development.md](docs/devops/develo
 
 Empty values count as unset. Only the first four are required; the rest have defaults or switch an optional feature on.
 
-| Variable                                                                 | Purpose                                                                           |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| `APP_URL`                                                                | Public URL of the web app: CORS origin and the base of email links                |
-| `DATABASE_URL`                                                           | Postgres connection for the app (pooled in production)                            |
-| `JWT_SECRET`                                                             | At least 32 characters; signs access tokens                                       |
-| `TOTP_ENC_KEY`                                                           | 32 random bytes, base64; encrypts two-factor secrets                              |
-| `DIRECT_URL`                                                             | Direct connection, used only by `prisma migrate`                                  |
-| `NODE_ENV`, `PORT`, `LOG_LEVEL`, `TRUST_PROXY`                           | Runtime behavior (`production` makes the refresh cookie Secure)                   |
-| `JWT_ISSUER`, `JWT_AUDIENCE`, `REFRESH_COOKIE_PATH`                      | Token claims and cookie path                                                      |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`          | Outgoing mail (Mailpit locally, Brevo in production)                              |
-| `STORAGE_DRIVER`, `LOCAL_STORAGE_DIR`, `API_PUBLIC_URL`                  | `local` (disk) or `r2`; where the local driver writes and how its links are built |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Required when `STORAGE_DRIVER=r2`                                                 |
-| `SIGNED_URL_TTL_SECONDS`                                                 | Lifetime of image links (default 900)                                             |
-| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_FALLBACK_MODELS`   | Summary generation; without a key and model, summaries are off                    |
+| Variable                                                                                                   | Purpose                                                                           |
+| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `APP_URL`                                                                                                  | Public URL of the web app: CORS origin and the base of email links                |
+| `DATABASE_URL`                                                                                             | Postgres connection for the app (pooled in production)                            |
+| `JWT_SECRET`                                                                                               | At least 32 characters; signs access tokens                                       |
+| `TOTP_ENC_KEY`                                                                                             | 32 random bytes, base64; encrypts two-factor secrets                              |
+| `DIRECT_URL`                                                                                               | Direct connection, used only by `prisma migrate`                                  |
+| `NODE_ENV`, `PORT`, `LOG_LEVEL`, `TRUST_PROXY`                                                             | Runtime behavior (`production` makes the refresh cookie Secure)                   |
+| `JWT_ISSUER`, `JWT_AUDIENCE`, `REFRESH_COOKIE_PATH`                                                        | Token claims and cookie path                                                      |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`                                            | Outgoing mail (Mailpit locally, Brevo in production)                              |
+| `STORAGE_DRIVER`, `LOCAL_STORAGE_DIR`, `API_PUBLIC_URL`                                                    | `local` (disk) or `s3`; where the local driver writes and how its links are built |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_FORCE_PATH_STYLE` | Required when `STORAGE_DRIVER=s3`                                                 |
+| `SIGNED_URL_TTL_SECONDS`                                                                                   | Lifetime of image links (default 900)                                             |
+| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_FALLBACK_MODELS`                                     | Summary generation; without a key and model, summaries are off                    |
 
 The web app reads `API_INTERNAL_URL` (where `/api/*` is forwarded) when it is built. Defaults and the complete list are in [docs/devops/development.md](docs/devops/development.md).
 
 ### Scripts
 
-| Command                                        | What it does                                                |
-| ---------------------------------------------- | ----------------------------------------------------------- |
-| `npm run dev:backend` / `npm run dev:frontend` | Start a dev server                                          |
-| `npm test`                                     | API tests (need Postgres) and web tests                     |
-| `npm run lint`                                 | ESLint (strict, type-aware) for backend and frontend        |
-| `npm run typecheck`                            | TypeScript, no emit                                         |
-| `npm run format` / `npm run format:check`      | Prettier                                                    |
-| `npm run build`                                | Build backend and frontend                                  |
-| `npm run prisma:generate -w backend`           | Generate the Prisma client (also run before test and build) |
-| `npm run prisma:deploy -w backend`             | Apply pending migrations                                    |
+Backend and frontend are independent packages; run these inside `backend/` or `frontend/`.
+
+| Command                                     | What it does                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| `npm run dev`                               | Start the dev server                                                |
+| `npm test`                                  | Tests (backend needs Postgres)                                      |
+| `npm run lint`                              | ESLint (strict, type-aware)                                         |
+| `npm run typecheck`                         | TypeScript, no emit                                                 |
+| `npm run format` / `npm run format:check`   | Prettier                                                            |
+| `npm run build`                             | Production build                                                    |
+| `npm run prisma:generate` / `prisma:deploy` | Backend only: generate the Prisma client / apply pending migrations |
 
 ## API
 
@@ -163,7 +164,7 @@ The complete list, with status, is in [docs/backend/security.md](docs/backend/se
 - **JWTs** are pinned to HS256, with issuer and audience checked.
 - **Two-factor secrets are encrypted at rest** with AES-256-GCM, bound to the owning user.
 - **Ownership is enforced inside every photo query** and answered with 404, so existence never leaks; each route has a test proving a second user cannot read, edit or delete the first user's photo.
-- **Uploads** are limited to 5 MB and to JPEG, PNG and WebP, decided from the file's bytes rather than its name or declared type; stored under random keys in a private bucket; served only through expiring signed links.
+- **Uploads** are limited to 10 MB and to JPEG, PNG and WebP, decided from the file's bytes rather than its name or declared type; stored under random keys in a private bucket; served only through expiring signed links.
 - **Hardening:** helmet, CORS limited to the web origin, rate limits on every auth route (stricter on login, register and resend), body-size limits, Zod validation on all input, generic 500 responses, logs that redact secrets and never contain description text, and Prisma only (no raw SQL).
 - **Dependencies** are audited in CI on every change.
 
@@ -190,7 +191,7 @@ Each significant decision has a short record in [docs/adr/](docs/adr):
 2. [Neon Postgres with Prisma](docs/adr/0002-neon-postgres-with-prisma.md)
 3. [argon2id for password hashing](docs/adr/0003-argon2id-for-password-hashing.md)
 4. [Short-lived access token plus rotating refresh token in an httpOnly cookie](docs/adr/0004-refresh-token-rotation-in-httponly-cookie.md)
-5. [Cloudflare R2 behind a storage interface](docs/adr/0005-r2-behind-a-storage-interface.md)
+5. [S3-compatible storage behind an interface](docs/adr/0005-s3-compatible-storage-behind-an-interface.md)
 6. [Summary generation with fallback, never blocking the save](docs/adr/0006-summary-generation-with-fallback.md)
 7. [Ownership enforced in the query, returning 404](docs/adr/0007-ownership-via-scoped-queries-returning-404.md)
 8. [Duplicate registration returns 409](docs/adr/0008-duplicate-registration-returns-409.md)

@@ -1,5 +1,5 @@
-# Build from the repository root (npm workspaces):
-#   docker build -f backend/Dockerfile -t travel-photo-journal-api .
+# Build from this directory:
+#   docker build -t travel-photo-journal-api backend
 
 ARG NODE_VERSION=22
 
@@ -7,36 +7,33 @@ ARG NODE_VERSION=22
 FROM node:${NODE_VERSION}-alpine AS build
 WORKDIR /app
 
-# Manifests first, so the dependency layer is cached until a package.json or the lockfile changes.
+# Manifests first, so the dependency layer is cached until package.json or the lockfile changes.
+# --ignore-scripts: "prepare" installs git hooks, which an image has no use for. The packages that
+# do need an install step are rebuilt explicitly below.
 COPY package.json package-lock.json ./
-COPY backend/package.json backend/package.json
-COPY frontend/package.json frontend/package.json
-RUN npm ci --workspace=backend --include-workspace-root
+RUN npm ci --ignore-scripts && npm rebuild argon2
 
-COPY backend backend
-RUN npm run build --workspace=backend
+COPY . .
+RUN npm run build
 
 # ---- prod-deps: only what the running server needs ----------------------------------------------
 FROM node:${NODE_VERSION}-alpine AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-COPY backend/package.json backend/package.json
-COPY frontend/package.json frontend/package.json
-# --ignore-scripts: the root "prepare" script installs git hooks, which a container has no use for.
-# The two packages that do need their install step are rebuilt explicitly: argon2 (native module)
-# and @prisma/engines (downloads the migration engine, which the non-root runtime user could not).
-RUN npm ci --workspace=backend --omit=dev --ignore-scripts && npm rebuild argon2 @prisma/engines
+# argon2 (native module) and @prisma/engines (downloads the migration engine, which the non-root
+# runtime user could not) are rebuilt explicitly because scripts are skipped.
+RUN npm ci --omit=dev --ignore-scripts && npm rebuild argon2 @prisma/engines
 
 # ---- runtime ------------------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-alpine AS runtime
 ENV NODE_ENV=production
-WORKDIR /app/backend
+WORKDIR /app
 
-COPY --from=prod-deps /app/node_modules /app/node_modules
-COPY --from=build /app/backend/dist ./dist
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
 # Needed at release time: `prisma migrate deploy` reads the schema, migrations and config.
-COPY backend/prisma ./prisma
-COPY backend/prisma.config.ts backend/package.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts package.json ./
 
 # Local-driver uploads live here; mount a volume to keep them. Owned by the unprivileged user.
 RUN mkdir -p /data/uploads && chown -R node:node /data

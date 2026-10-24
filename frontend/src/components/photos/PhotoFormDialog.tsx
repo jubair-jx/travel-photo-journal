@@ -128,7 +128,7 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
           <p className="mt-1 text-xs text-slate-400">Leave empty to keep the current image.</p>
         )}
         {!editing && !imageError && (
-          <p className="mt-1 text-xs text-slate-400">JPEG, PNG or WebP, up to 5 MB.</p>
+          <p className="mt-1 text-xs text-slate-400">JPEG, PNG or WebP, up to 10 MB.</p>
         )}
         {imageError && (
           <p id="photo-image-error" role="alert" className="mt-1 text-sm text-red-400">

@@ -7,35 +7,39 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { assertValidObjectKey, isValidObjectKey, type StorageService } from "./storage.js";
 
-export interface R2StorageOptions {
+export interface S3StorageOptions {
   client: S3Client;
   bucket: string;
   urlTtlSeconds: number;
 }
 
-export interface R2Credentials {
-  accountId: string;
+export interface S3ClientSettings {
+  endpoint: string;
+  region: string;
   accessKeyId: string;
   secretAccessKey: string;
+  forcePathStyle: boolean;
 }
 
-export function createR2Client({
-  accountId,
+export function createS3Client({
+  endpoint,
+  region,
   accessKeyId,
   secretAccessKey,
-}: R2Credentials): S3Client {
+  forcePathStyle,
+}: S3ClientSettings): S3Client {
   return new S3Client({
-    // R2 ignores the region but the SDK requires one; "auto" is Cloudflare's documented value.
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    endpoint,
+    region,
+    forcePathStyle,
     credentials: { accessKeyId, secretAccessKey },
   });
 }
 
-// Private Cloudflare R2 bucket over the S3 API. Nothing is ever public: clients only get
-// short-lived presigned GET links.
-export class R2Storage implements StorageService {
-  constructor(private readonly options: R2StorageOptions) {}
+// Private bucket on any S3-compatible service (Neon Object Storage, Cloudflare R2, AWS S3).
+// Nothing is ever public: clients only get short-lived presigned GET links.
+export class S3Storage implements StorageService {
+  constructor(private readonly options: S3StorageOptions) {}
 
   async upload(key: string, body: Buffer, contentType: string): Promise<void> {
     assertValidObjectKey(key);

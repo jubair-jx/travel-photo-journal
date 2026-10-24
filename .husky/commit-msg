@@ -1,1 +1,8 @@
-npx --no -- commitlint --edit "$1"
+# commitlint lives in each package; use the first one that is installed. $1 is relative to the repo root.
+root=$(pwd)
+for pkg in backend frontend; do
+  if [ -d "$pkg/node_modules/@commitlint" ]; then
+    cd "$pkg" && npx --no-install commitlint --edit "$root/$1"
+    exit $?
+  fi
+done

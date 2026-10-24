@@ -77,17 +77,17 @@ describe("validateImage", () => {
     expect(validateImage(undefined, false)).toBeUndefined();
   });
 
-  it("accepts JPEG, PNG and WebP up to 5 MB", () => {
+  it("accepts JPEG, PNG and WebP up to 10 MB", () => {
     for (const type of ["image/jpeg", "image/png", "image/webp"]) {
-      expect(validateImage(file(type, 5 * 1024 * 1024), true)).toBeUndefined();
+      expect(validateImage(file(type, 10 * 1024 * 1024), true)).toBeUndefined();
     }
   });
 
-  it("rejects other types and anything over 5 MB", () => {
+  it("rejects other types and anything over 10 MB", () => {
     expect(validateImage(file("image/gif", 10), true)).toBe("Use a JPEG, PNG or WebP image");
     expect(validateImage(file("application/pdf", 10), true)).toBe("Use a JPEG, PNG or WebP image");
-    expect(validateImage(file("image/png", 5 * 1024 * 1024 + 1), true)).toBe(
-      "Image must be 5 MB or smaller",
+    expect(validateImage(file("image/png", 10 * 1024 * 1024 + 1), true)).toBe(
+      "Image must be 10 MB or smaller",
     );
   });
 });

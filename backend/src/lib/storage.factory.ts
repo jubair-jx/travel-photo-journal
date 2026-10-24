@@ -2,14 +2,14 @@ import { createHmac } from "node:crypto";
 import type { Config } from "../config/env.js";
 import type { StorageService } from "./storage.js";
 import { LocalDiskStorage } from "./storage.local.js";
-import { createR2Client, R2Storage } from "./storage.r2.js";
+import { createS3Client, S3Storage } from "./storage.s3.js";
 
 export function createStorage(config: Config): StorageService {
   const { storage } = config;
 
-  if (storage.driver === "r2") {
-    return new R2Storage({
-      client: createR2Client(storage),
+  if (storage.driver === "s3") {
+    return new S3Storage({
+      client: createS3Client(storage),
       bucket: storage.bucket,
       urlTtlSeconds: storage.urlTtlSeconds,
     });

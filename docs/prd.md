@@ -52,7 +52,7 @@ A web application and REST API where a person registers, verifies their email, s
 ### Managing photos
 
 29. As a **Verified User**, I want to add a **Photo** with an **Image**, name, location and description, so that I can record a memory.
-30. As a **Verified User**, I want only JPEG, PNG and WebP up to 5 MB accepted, so that the journal stays fast and safe.
+30. As a **Verified User**, I want only JPEG, PNG and WebP up to 10 MB accepted, so that the journal stays fast and safe.
 31. As a **Verified User**, I want a file that merely claims to be an image rejected, so that disguised files cannot be uploaded.
 32. As a **Verified User**, I want an automatic **Summary** of my description, so that I can scan my journal quickly.
 33. As a **Verified User**, I want my **Photo** to save even when summary generation is unavailable, so that a third-party outage never loses my memory.
@@ -117,8 +117,8 @@ A web application and REST API where a person registers, verifies their email, s
 
 - Schema: User, EmailVerificationToken, RefreshToken and Photo, with snake_case table names, cascading deletes from User, unique token hashes, and an index on (user, created time) for the list query.
 - All photo queries are scoped by owner and return 404 for foreign or missing records (ADR-0007).
-- Uploads accept JPEG, PNG and WebP up to 5 MB, verified by file signature rather than the declared type. Object keys are random and derived from user and a generated identifier; the client filename is never used.
-- Images live in a private R2 bucket behind a storage interface with a local-disk implementation for development and tests; responses carry short-lived signed links (ADR-0005).
+- Uploads accept JPEG, PNG and WebP up to 10 MB, verified by file signature rather than the declared type. Object keys are random and derived from user and a generated identifier; the client filename is never used.
+- Images live in a private S3-compatible bucket (Neon Object Storage) behind a storage interface with a local-disk implementation for development and tests; responses carry short-lived signed links (ADR-0005).
 - **Summary** generation runs server-side on create and on description change, with model fallback and an 8-second overall deadline, and degrades to no summary on failure (ADR-0006).
 
 ### Deep modules to test in isolation
@@ -126,7 +126,7 @@ A web application and REST API where a person registers, verifies their email, s
 - Token and cookie lifecycle (issue, rotate, detect reuse, revoke)
 - Password and secret handling (hash, verify, encrypt, decrypt)
 - Upload validation (size and signature checks)
-- Storage interface (local and R2 implementations behind one contract)
+- Storage interface (local and S3 implementations behind one contract)
 - Summarizer (fallback order, deadline, failure handling)
 - Config loader (valid and invalid environments)
 
@@ -140,7 +140,7 @@ A web application and REST API where a person registers, verifies their email, s
 
 - Docker images for the API and web app and a compose file with Postgres, API, web and a mail catcher; migrations run on release.
 - CI runs install, format check, lint, typecheck, tests against a Postgres service, build and a dependency audit.
-- Production: API on Railway, web on Vercel, Neon for data, R2 for images, Brevo for mail.
+- Production: API on Railway, web on Vercel, Neon for data and images, Brevo for mail.
 
 ## Testing Decisions
 

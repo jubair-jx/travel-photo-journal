@@ -81,9 +81,9 @@ The index on (`user_id`, `created_at`) serves the list query (a user's photos, n
 ## Migrations
 
 - Create (development): `DIRECT_URL=<direct url> npx prisma migrate dev --name <change>` from `backend`.
-- Apply (release): `npm run prisma:deploy -w backend`.
+- Apply (release): `cd backend && npm run prisma:deploy`.
 - Tests apply pending migrations to the test database automatically before the suite runs.
-- The generated client is not committed; `npm run prisma:generate -w backend` produces it, and the test, typecheck and build scripts do so first.
+- The generated client is not committed; `cd backend && npm run prisma:generate` produces it, and the test, typecheck and build scripts do so first.
 
 | Migration                            | Contents                             |
 | ------------------------------------ | ------------------------------------ |
