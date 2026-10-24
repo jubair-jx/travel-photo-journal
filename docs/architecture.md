@@ -47,7 +47,7 @@ Each module owns its HTTP surface and business logic:
 - `*.service.ts` holds the behavior. It is built by a factory that receives its dependencies (database, mailer, config, logger), so it has no hidden globals.
 - `*.schema.ts` holds the Zod input schemas; they are the single definition of what each endpoint accepts.
 
-`auth` today covers register, verify-email and resend-verification.
+`auth` today covers registration (`auth.service`: register, verify-email, resend-verification) and sessions (`session.service`: login, refresh, logout). Cross-cutting authentication is the `requireAuth` middleware, which verifies the bearer access token and sets `req.auth.userId` for protected routes.
 
 ## Data and mail
 

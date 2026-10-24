@@ -95,3 +95,44 @@ For an unverified account, earlier unused links stop working and the new one is 
 | ------ | --------------- | ------------------------------------------------------ |
 | 409    | `EMAIL_TAKEN`   | Registering an address that already has an account.    |
 | 400    | `INVALID_TOKEN` | Verification token unknown, used, expired or replaced. |
+
+### POST /auth/login
+
+Signs in a verified user.
+
+- **Auth:** none. Rate limited (10 per 15 minutes per client IP).
+- **Body:** `{ "email": string, "password": string }`. The email is trimmed and lowercased.
+- **200:** `{ "success": true, "data": { "accessToken": string, "expiresIn": 900, "user": { "id": string, "email": string } } }` and a `Set-Cookie` for the refresh token (httpOnly, `SameSite=Lax`, `Secure` in production, 7 days).
+- **401 `INVALID_CREDENTIALS`:** unknown email or wrong password. The two cases are identical in body and (approximately) in response time, and neither sets a cookie.
+- **403 `EMAIL_NOT_VERIFIED`:** the password was correct but the address is not yet verified. Only returned after the password check, so it does not reveal which emails have accounts.
+- **400 `VALIDATION_ERROR`**, **429 `RATE_LIMITED`**
+
+The access token goes in `Authorization: Bearer <token>` on protected routes. It is a 15 minute HS256 JWT with issuer and audience claims.
+
+### POST /auth/refresh
+
+Exchanges the refresh cookie for a new access token and a new refresh cookie.
+
+- **Auth:** the refresh cookie; no body. Rate limited (120 per 15 minutes per client IP).
+- **200:** same body as login. The old refresh token is retired.
+- **401 `INVALID_REFRESH_TOKEN`:** missing, unknown, expired or already-used cookie. The response clears the cookie. If the token had already been used, every token issued after it in that session is revoked as well (theft response; see ADR-0009).
+
+### POST /auth/logout
+
+Ends the current session.
+
+- **Auth:** the refresh cookie, if present. Rate limited like refresh.
+- **200:** `{ "success": true, "data": null }` and a cleared cookie. Always succeeds, including with no cookie or an unknown one, so it is safe to call twice. Other sessions of the same user (other devices) are untouched.
+
+### Protected routes
+
+Routes behind `requireAuth` expect `Authorization: Bearer <accessToken>`. Anything else (missing header, wrong scheme, bad signature, expired, wrong issuer or audience, wrong algorithm) gets the same `401 UNAUTHENTICATED`.
+
+## Error codes added (login and sessions)
+
+| Status | Code                    | When                                                         |
+| ------ | ----------------------- | ------------------------------------------------------------ |
+| 401    | `INVALID_CREDENTIALS`   | Unknown email or wrong password.                             |
+| 403    | `EMAIL_NOT_VERIFIED`    | Correct password, unverified address.                        |
+| 401    | `INVALID_REFRESH_TOKEN` | Refresh cookie missing, unknown, expired, revoked or reused. |
+| 401    | `UNAUTHENTICATED`       | Missing or invalid access token on a protected route.        |

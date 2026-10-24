@@ -38,7 +38,21 @@ Prisma 7 reads `DIRECT_URL` from `prisma.config.ts`; the schema file contains no
 | `used_at`    | timestamptz?      | Set when the token is consumed                                   |
 | `created_at` | timestamptz       | Default now                                                      |
 
-Later slices add `refresh_tokens` and `photos`.
+### refresh_tokens
+
+| Column           | Type                        | Notes                                                           |
+| ---------------- | --------------------------- | --------------------------------------------------------------- |
+| `id`             | uuid, PK                    |                                                                 |
+| `user_id`        | uuid, FK to users           | `ON DELETE CASCADE`; indexed                                    |
+| `token_hash`     | text, unique                | SHA-256 of the cookie value; the raw token is never stored      |
+| `expires_at`     | timestamptz                 | Issue time plus 7 days                                          |
+| `revoked_at`     | timestamptz?                | Set on rotation, logout, or theft response                      |
+| `replaced_by_id` | uuid?, FK to refresh_tokens | The successor issued at rotation; `ON DELETE SET NULL`; indexed |
+| `created_at`     | timestamptz                 | Default now                                                     |
+
+A session is the chain of rows linked by `replaced_by_id`. Rotation is a conditional UPDATE (`revoked_at IS NULL AND expires_at > now`) followed by creating the successor, in one transaction. See ADR-0009.
+
+Later slices add `photos`.
 
 ## Design notes
 
