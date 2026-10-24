@@ -1,7 +1,19 @@
-import { generateToken, hashPassword, hashToken, verifyPassword } from "../../lib/crypto.js";
-import { emailNotVerified, invalidCredentials, invalidRefreshToken } from "../../lib/errors.js";
+import {
+  decryptSecret,
+  generateToken,
+  hashPassword,
+  hashToken,
+  verifyPassword,
+} from "../../lib/crypto.js";
+import {
+  emailNotVerified,
+  invalidCredentials,
+  invalidRefreshToken,
+  totpRequired,
+} from "../../lib/errors.js";
 import type { AccessTokenService } from "../../lib/jwt.js";
 import type { PrismaClient } from "../../lib/prisma.js";
+import { verifyTotp } from "../../lib/totp.js";
 import type { LoginInput } from "./auth.schema.js";
 
 export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -9,6 +21,7 @@ export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export interface SessionServiceDeps {
   prisma: PrismaClient;
   accessTokens: AccessTokenService;
+  totpEncryptionKey: Buffer;
 }
 
 export interface SessionTokens {
@@ -23,7 +36,11 @@ export interface SessionTokens {
 let dummyHash: Promise<string> | undefined;
 const getDummyHash = (): Promise<string> => (dummyHash ??= hashPassword("timing-equalizer"));
 
-export function createSessionService({ prisma, accessTokens }: SessionServiceDeps) {
+export function createSessionService({
+  prisma,
+  accessTokens,
+  totpEncryptionKey,
+}: SessionServiceDeps) {
   async function startSession(user: { id: string; email: string }): Promise<SessionTokens> {
     const refreshToken = generateToken();
     await prisma.refreshToken.create({
@@ -42,12 +59,20 @@ export function createSessionService({ prisma, accessTokens }: SessionServiceDep
     };
   }
 
-  async function login({ email, password }: LoginInput): Promise<SessionTokens> {
+  async function login({ email, password, totpCode }: LoginInput): Promise<SessionTokens> {
     const user = await prisma.user.findUnique({ where: { email } });
     const matches = await verifyPassword(user?.passwordHash ?? (await getDummyHash()), password);
     if (!user || !matches) throw invalidCredentials();
     // Only after the password is right: telling an outsider "unverified" would confirm the account.
     if (!user.emailVerifiedAt) throw emailNotVerified();
+
+    if (user.twoFactorEnabled && user.twoFactorSecret) {
+      // Asking for the code is only safe now that the password is proven (see above).
+      if (!totpCode) throw totpRequired();
+      const secret = decryptSecret(user.twoFactorSecret, totpEncryptionKey, user.id);
+      // A wrong code looks exactly like a wrong password, so a guess reveals nothing.
+      if (!(await verifyTotp(secret, totpCode))) throw invalidCredentials();
+    }
 
     return startSession(user);
   }
