@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 import { unauthenticated } from "../lib/errors.js";
 import type { AccessTokenService } from "../lib/jwt.js";
 
@@ -26,4 +26,11 @@ export function requireAuth(tokens: AccessTokenService): RequestHandler {
       next(unauthenticated());
     }
   };
+}
+
+// For handlers mounted behind `requireAuth`: the id of the signed-in user. The check keeps the type
+// honest (`req.auth` is optional) and means a route wired up without the middleware fails closed.
+export function authenticatedUserId(req: Pick<Request, "auth">): string {
+  if (!req.auth) throw unauthenticated();
+  return req.auth.userId;
 }

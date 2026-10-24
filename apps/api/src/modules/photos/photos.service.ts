@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Logger } from "pino";
-import { notFound } from "../../lib/errors.js";
+import { photoNotFound } from "../../lib/errors.js";
 import { isRecordNotFound, type Photo, type PrismaClient } from "../../lib/prisma.js";
 import type { StorageService } from "../../lib/storage.js";
 import { SummaryError, type Summarizer } from "../../lib/summarizer.js";
@@ -33,8 +33,6 @@ export interface PhotoPage {
   total: number;
   totalPages: number;
 }
-
-const photoNotFound = () => notFound("Photo not found");
 
 export function createPhotoService({ prisma, storage, summarizer, logger }: PhotoServiceDeps) {
   async function toView(photo: Photo): Promise<PhotoView> {

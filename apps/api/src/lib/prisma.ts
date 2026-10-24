@@ -2,19 +2,18 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client.js";
 
 export { PrismaClient };
+export type { Photo } from "../generated/prisma/client.js";
 
 export function createPrismaClient(databaseUrl: string): PrismaClient {
   return new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
 }
 
-// Postgres unique violations surface from Prisma as error code P2002.
-export function isUniqueViolation(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
-}
+// Prisma reports database failures as errors carrying a code such as "P2002".
+const hasCode = (error: unknown, code: string): boolean =>
+  typeof error === "object" && error !== null && "code" in error && error.code === code;
 
-export type { Photo } from "../generated/prisma/client.js";
+// P2002: a unique constraint was violated.
+export const isUniqueViolation = (error: unknown): boolean => hasCode(error, "P2002");
 
-// Prisma error code for "the record to update or delete does not exist".
-export function isRecordNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
-}
+// P2025: the record to update or delete does not exist.
+export const isRecordNotFound = (error: unknown): boolean => hasCode(error, "P2025");

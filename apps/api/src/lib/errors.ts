@@ -54,3 +54,5 @@ export const payloadTooLarge = (message = "Request body is too large"): AppError
 
 export const unsupportedMediaType = (message: string): AppError =>
   new AppError(415, "UNSUPPORTED_MEDIA_TYPE", message);
+
+export const photoNotFound = (): AppError => notFound("Photo not found");
