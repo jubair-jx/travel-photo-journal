@@ -12,7 +12,4 @@
 !.env.example
 docs/learn
 docs/agents
-.claude
-CLAUDE.md
-AGENTS.md
 **/*.log

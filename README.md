@@ -46,7 +46,7 @@ flowchart LR
   API -->|"Prisma, pooled"| DB[("Neon Postgres")]
   API -->|"S3 API, signed URLs"| R2[("Cloudflare R2<br/>private bucket")]
   API -->|"SMTP"| Mail["Brevo"]
-  API -->|"HTTPS, 8 s deadline"| LLM["OpenRouter"]
+  API -->|"HTTPS, 8 s deadline"| Summaries["OpenRouter"]
   Browser -.->|"signed image links"| R2
 ```
 
