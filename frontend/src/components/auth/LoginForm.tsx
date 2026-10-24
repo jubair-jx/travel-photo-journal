@@ -82,7 +82,7 @@ export function LoginForm() {
   if (step === "code") {
     return (
       <form onSubmit={submitCode} noValidate className="space-y-4">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-slate-300">
           Enter the 6-digit code from your authenticator app to finish signing in.
         </p>
         {failure && <Alert>{failure}</Alert>}
@@ -133,21 +133,24 @@ export function LoginForm() {
         error={errors.password?.message}
         {...register("password")}
       />
-      <label className="flex items-center gap-2 text-sm text-slate-600">
+      <label className="flex items-center gap-2 text-sm text-slate-300">
         <input
           type="checkbox"
           checked={remember}
           onChange={(event) => setRemember(event.target.checked)}
-          className="size-4 rounded border-slate-300 text-indigo-600"
+          className="size-4 rounded border-white/20 bg-white/5 accent-orange-500"
         />
         Remember my email on this device
       </label>
       <Button type="submit" loading={isLoading} className="w-full">
         Sign in
       </Button>
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-slate-300">
         New here?{" "}
-        <Link href="/register" className="font-medium text-indigo-600 hover:underline">
+        <Link
+          href="/register"
+          className="font-medium text-orange-300 hover:text-orange-200 hover:underline"
+        >
           Create an account
         </Link>
       </p>

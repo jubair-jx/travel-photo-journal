@@ -42,9 +42,9 @@ export function DeletePhotoDialog({
     <Dialog open={photo !== null} title="Delete this photo?" onClose={close}>
       <div className="space-y-4">
         {failure && <Alert>{failure}</Alert>}
-        <p className="text-sm text-slate-600">
-          <strong>{photo?.name}</strong> and its image will be permanently removed. This cannot be
-          undone.
+        <p className="text-sm text-slate-300">
+          <strong className="text-white">{photo?.name}</strong> and its image will be permanently
+          removed. This cannot be undone.
         </p>
         <div className="flex justify-end gap-3">
           <Button variant="ghost" onClick={close}>

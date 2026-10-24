@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
+import { Logo } from "@/components/layout/Logo";
 import { FullPageSpinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
 import { useLogoutMutation } from "@/store/api";
@@ -35,39 +36,52 @@ export function AppShell({ children }: { children: ReactNode }) {
     router.replace("/login");
   };
 
+  const initial = user?.email.charAt(0).toUpperCase() ?? "?";
+
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
-          <Link href="/photos" className="font-semibold text-indigo-600">
-            Travel Photo Journal
+      <header className="sticky top-0 z-30 px-4 pt-4">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 rounded-2xl bg-white/6 px-4 py-2.5 ring-1 ring-white/10 backdrop-blur-xl">
+          <Link href="/photos" aria-label="Travel Journal home">
+            <Logo />
           </Link>
-          <nav aria-label="Main" className="flex gap-1">
-            {LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                aria-current={pathname.startsWith(link.href) ? "page" : undefined}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  pathname.startsWith(link.href)
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "text-slate-600 hover:bg-slate-100",
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
+          <nav aria-label="Main" className="ml-4 flex gap-1">
+            {LINKS.map((link) => {
+              const active = pathname.startsWith(link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "rounded-lg px-3.5 py-1.5 text-sm font-medium transition",
+                    active
+                      ? "bg-white/12 text-white"
+                      : "text-slate-400 hover:bg-white/8 hover:text-white",
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-sm text-slate-500 sm:inline">{user?.email}</span>
+            <span className="hidden max-w-48 truncate text-sm text-slate-400 md:inline">
+              {user?.email}
+            </span>
+            <span
+              aria-hidden="true"
+              className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-sky-400 to-fuchsia-500 text-sm font-semibold text-white"
+            >
+              {initial}
+            </span>
             <Button variant="secondary" onClick={signOut} loading={isLoading}>
               Sign out
             </Button>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-10">{children}</main>
     </div>
   );
 }

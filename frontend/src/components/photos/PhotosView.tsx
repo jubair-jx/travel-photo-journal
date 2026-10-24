@@ -18,13 +18,13 @@ function SkeletonGrid() {
       {Array.from({ length: 6 }, (_, index) => (
         <li
           key={index}
-          className="animate-pulse overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200"
+          className="animate-pulse overflow-hidden rounded-3xl bg-white/6 ring-1 ring-white/10"
         >
-          <div className="aspect-4/3 bg-slate-200" />
+          <div className="aspect-4/3 bg-white/10" />
           <div className="space-y-3 p-4">
-            <div className="h-4 w-2/3 rounded bg-slate-200" />
-            <div className="h-3 w-1/3 rounded bg-slate-200" />
-            <div className="h-3 w-full rounded bg-slate-200" />
+            <div className="h-4 w-2/3 rounded bg-white/10" />
+            <div className="h-3 w-1/3 rounded bg-white/10" />
+            <div className="h-3 w-full rounded bg-white/10" />
           </div>
         </li>
       ))}
@@ -52,16 +52,26 @@ export function PhotosView() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Your photos</h1>
+          <p className="text-sm font-medium tracking-widest text-orange-300 uppercase">
+            Your journal
+          </p>
+          <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+            Places &amp; <span className="italic">memories</span>
+          </h1>
           {data && data.total > 0 && (
-            <p className="text-sm text-slate-500">
+            <p className="mt-2 text-sm text-slate-400">
               {data.total} {data.total === 1 ? "photo" : "photos"}
             </p>
           )}
         </div>
-        <Button onClick={() => setAdding(true)}>Add photo</Button>
+        <Button onClick={() => setAdding(true)}>
+          <span aria-hidden="true" className="text-lg leading-none">
+            +
+          </span>
+          Add photo
+        </Button>
       </div>
 
       {isLoading && <SkeletonGrid />}
@@ -76,9 +86,23 @@ export function PhotosView() {
       )}
 
       {data && data.items.length === 0 && page === 1 && (
-        <Card className="py-12 text-center">
-          <h2 className="text-lg font-semibold text-slate-900">No photos yet</h2>
-          <p className="mx-auto mt-1 mb-6 max-w-sm text-sm text-slate-600">
+        <Card className="py-16 text-center">
+          <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-linear-to-br from-amber-400/20 to-pink-500/20 ring-1 ring-white/10">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              className="size-8 text-orange-300"
+              aria-hidden="true"
+            >
+              <rect x="3" y="5" width="18" height="14" rx="3" />
+              <circle cx="12" cy="12" r="3.5" />
+              <path d="M8 5l1.2-1.8h5.6L16 5" />
+            </svg>
+          </div>
+          <h2 className="font-display text-2xl font-semibold text-white">No photos yet</h2>
+          <p className="mx-auto mt-2 mb-7 max-w-sm text-sm text-slate-300">
             Add your first travel photo with a note about where it was taken. Only you can see it.
           </p>
           <Button onClick={() => setAdding(true)}>Add your first photo</Button>
@@ -109,7 +133,7 @@ export function PhotosView() {
               <Button variant="secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 Previous
               </Button>
-              <span className="text-sm text-slate-600">
+              <span className="text-sm text-slate-400">
                 Page {data.page} of {data.totalPages}
               </span>
               <Button

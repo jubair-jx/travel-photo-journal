@@ -51,13 +51,16 @@ export function RegisterForm() {
           Account created. We sent a verification link to <strong>{registeredEmail}</strong>. Open
           it to activate your account.
         </Alert>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-slate-300">
           Nothing arrived? Check spam, or ask for a new link.
         </p>
         <ResendVerification email={registeredEmail} />
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-slate-300">
           Already verified?{" "}
-          <Link href="/login" className="font-medium text-indigo-600 hover:underline">
+          <Link
+            href="/login"
+            className="font-medium text-orange-300 hover:text-orange-200 hover:underline"
+          >
             Sign in
           </Link>
         </p>
@@ -93,9 +96,12 @@ export function RegisterForm() {
       <Button type="submit" loading={isLoading} className="w-full">
         Create account
       </Button>
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-slate-300">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-indigo-600 hover:underline">
+        <Link
+          href="/login"
+          className="font-medium text-orange-300 hover:text-orange-200 hover:underline"
+        >
           Sign in
         </Link>
       </p>
