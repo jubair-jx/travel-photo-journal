@@ -3,7 +3,12 @@ import type { ParamsDictionary } from "express-serve-static-core";
 import { photoNotFound, validationError } from "../../lib/errors.js";
 import { sendSuccess } from "../../lib/response.js";
 import { authenticatedUserId } from "../../middleware/auth.js";
-import { photoIdSchema, type ListQuery, type PhotoFields } from "./photos.schema.js";
+import {
+  photoIdSchema,
+  type DescribeFields,
+  type ListQuery,
+  type PhotoFields,
+} from "./photos.schema.js";
 import type { PhotoService } from "./photos.service.js";
 
 // A malformed id cannot belong to anyone, so it is simply "not found" like any other miss.
@@ -42,5 +47,10 @@ export function createPhotoController(service: PhotoService) {
     sendSuccess(res, await service.remove(authenticatedUserId(req), photoIdOf(req)));
   };
 
-  return { create, list, get, update, remove };
+  const describe: RequestHandler<ParamsDictionary, unknown, DescribeFields> = async (req, res) => {
+    if (!req.image) throw validationError([{ path: "image", message: "An image is required" }]);
+    sendSuccess(res, await service.describe(req.image, req.body));
+  };
+
+  return { create, list, get, update, remove, describe };
 }

@@ -7,6 +7,7 @@ import type { AuthRateLimits } from "../modules/auth/auth.routes.js";
 import { createTestPrisma, testDatabaseUrl } from "./db.js";
 import { FakeMailer } from "./fake-mailer.js";
 import { FakeStorage } from "./fake-storage.js";
+import { FakeDescriber } from "./fake-describer.js";
 import { FakeSummarizer } from "./fake-summarizer.js";
 
 export const testConfig: Config = {
@@ -49,6 +50,7 @@ export interface TestContext {
   mailer: FakeMailer;
   storage: FakeStorage;
   summarizer: FakeSummarizer;
+  describer: FakeDescriber;
 }
 
 export interface TestContextOptions {
@@ -62,6 +64,7 @@ export function buildTestContext(options: TestContextOptions = {}): TestContext 
   const mailer = new FakeMailer();
   const storage = new FakeStorage();
   const summarizer = new FakeSummarizer();
+  const describer = new FakeDescriber();
   const app = createApp({
     config: { ...testConfig, ...options.config },
     logger: options.logger ?? pino({ level: "silent" }),
@@ -69,9 +72,10 @@ export function buildTestContext(options: TestContextOptions = {}): TestContext 
     mailer,
     storage,
     summarizer,
+    describer,
     authRateLimits: { ...generousLimits, ...options.authRateLimits },
   });
-  return { app, prisma, mailer, storage, summarizer };
+  return { app, prisma, mailer, storage, summarizer, describer };
 }
 
 export function buildTestApp(overrides: Partial<Config> = {}): Express {

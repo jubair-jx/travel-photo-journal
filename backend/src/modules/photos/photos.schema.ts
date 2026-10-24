@@ -10,6 +10,13 @@ export const photoFieldsSchema = z.object({
 });
 export type PhotoFields = z.infer<typeof photoFieldsSchema>;
 
+// Optional context for the AI description; nothing here is stored.
+export const describeFieldsSchema = z.object({
+  name: z.string().trim().max(120).optional(),
+  location: z.string().trim().max(120).optional(),
+});
+export type DescribeFields = z.infer<typeof describeFieldsSchema>;
+
 export const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),

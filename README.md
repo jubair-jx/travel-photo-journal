@@ -12,6 +12,7 @@ A private journal for travel photos. Register, verify your email, sign in (optio
 
 - **Accounts:** registration with email verification (single-use, 24-hour links), sign-in with a short-lived access token and a rotating refresh token, optional TOTP two-factor authentication with a QR code.
 - **Photos:** create, list (paginated, newest first), view, edit (optionally replacing the image) and delete. Images are validated by their actual content, stored privately and shown through short-lived signed links.
+- **AI description:** in the add-photo form, "Write with AI" looks at the chosen picture and drafts the description, which you can edit before saving.
 - **Summaries:** a short summary of each description is generated on save with the cheapest Claude model (Haiku, a fraction of a cent per photo), or via OpenRouter with model fallback; if it is unavailable, the photo still saves.
 - **Privacy by construction:** every photo query is scoped to its owner, and another user's photo behaves exactly like one that does not exist.
 

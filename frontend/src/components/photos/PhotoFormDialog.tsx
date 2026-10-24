@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -12,7 +12,12 @@ import { LocationField } from "@/components/ui/LocationField";
 import { applyFieldIssues, isApiError } from "@/lib/errors";
 import { photoFieldsSchema, validateImage, type PhotoFieldValues } from "@/lib/schemas";
 import type { Photo } from "@/lib/types";
-import { useCreatePhotoMutation, useUpdatePhotoMutation } from "@/store/api";
+import { shrinkImage } from "@/lib/image";
+import {
+  useCreatePhotoMutation,
+  useDescribePhotoMutation,
+  useUpdatePhotoMutation,
+} from "@/store/api";
 
 interface PhotoFormDialogProps {
   open: boolean;
@@ -27,6 +32,7 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
   const editing = photo !== undefined;
   const [createPhoto, creating] = useCreatePhotoMutation();
   const [updatePhoto, updating] = useUpdatePhotoMutation();
+  const [describePhoto, describing] = useDescribePhotoMutation();
   const [file, setFile] = useState<File | undefined>();
   const [imageError, setImageError] = useState<string | undefined>();
   const [failure, setFailure] = useState<string | null>(null);
@@ -34,6 +40,8 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
   const {
     register,
     control,
+    getValues,
+    setValue,
     handleSubmit,
     setError,
     formState: { errors },
@@ -88,6 +96,34 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
   };
 
   const shownImage = preview ?? photo?.imageUrl;
+  const description = useWatch({ control, name: "description" });
+  const hasDescription = description.trim().length > 0;
+
+  // Drafts the description from the chosen picture. The user reads and edits it before saving.
+  const writeWithAi = async () => {
+    if (!file) return;
+    try {
+      const body = new FormData();
+      body.set("image", await shrinkImage(file));
+      const { name, location } = getValues();
+      if (name.trim()) body.set("name", name.trim());
+      if (location.trim()) body.set("location", location.trim());
+
+      const result = await describePhoto(body);
+      if ("error" in result) {
+        toast.error(
+          isApiError(result.error) && result.error.code === "AI_UNAVAILABLE"
+            ? "AI descriptions are not available right now. You can write it yourself."
+            : "Could not write a description. Try again, or write it yourself.",
+        );
+        return;
+      }
+      setValue("description", result.data.description, { shouldValidate: true, shouldDirty: true });
+      toast.success("Draft ready. Edit it however you like.");
+    } catch {
+      toast.error("Could not read that image. You can write the description yourself.");
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit(submit)} noValidate className="space-y-4">
@@ -109,10 +145,28 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
       <TextAreaField
         label="Description"
         rows={4}
-        hint="A short summary is generated from this."
+        hint="A short AI summary is generated from this when you save."
         error={errors.description?.message}
         {...register("description")}
       />
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-linear-to-r from-violet-500/10 via-fuchsia-500/10 to-orange-500/10 px-4 py-3 ring-1 ring-white/10">
+        <span aria-hidden="true" className="text-lg">
+          ✨
+        </span>
+        <p className="min-w-0 flex-1 text-sm text-slate-300">
+          {file
+            ? "Let AI look at your photo and draft the description."
+            : "Choose an image below, then let AI draft the description."}
+        </p>
+        <Button
+          variant="secondary"
+          disabled={!file}
+          loading={describing.isLoading}
+          onClick={() => void writeWithAi()}
+        >
+          {hasDescription ? "Rewrite with AI" : "Write with AI"}
+        </Button>
+      </div>
       <div>
         <label htmlFor="photo-image" className="mb-1 block text-sm font-medium text-slate-200">
           Image

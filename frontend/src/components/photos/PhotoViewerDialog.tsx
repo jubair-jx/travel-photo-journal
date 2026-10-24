@@ -47,9 +47,12 @@ export function PhotoViewerDialog({
           </div>
 
           {photo.summary && (
-            <p className="rounded-2xl bg-white/5 px-4 py-3 text-slate-200 italic ring-1 ring-white/10">
-              &ldquo;{photo.summary}&rdquo;
-            </p>
+            <div className="space-y-2 rounded-2xl bg-violet-500/10 px-4 py-3 ring-1 ring-violet-400/20">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-violet-200 uppercase">
+                <span aria-hidden="true">✨</span> AI summary
+              </span>
+              <p className="text-slate-100 italic">&ldquo;{photo.summary}&rdquo;</p>
+            </div>
           )}
 
           <p className="text-sm leading-relaxed whitespace-pre-line text-slate-300">

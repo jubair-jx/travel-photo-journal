@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Logger } from "pino";
-import { photoNotFound } from "../../lib/errors.js";
+import { DescribeError, MAX_DESCRIBE_BYTES, type Describer } from "../../lib/describer.js";
+import { aiUnavailable, payloadTooLarge, photoNotFound } from "../../lib/errors.js";
 import { isRecordNotFound, type Photo, type PrismaClient } from "../../lib/prisma.js";
 import type { StorageService } from "../../lib/storage.js";
 import { SummaryError, type Summarizer } from "../../lib/summarizer.js";
@@ -11,6 +12,7 @@ export interface PhotoServiceDeps {
   prisma: PrismaClient;
   storage: StorageService;
   summarizer: Summarizer;
+  describer: Describer;
   logger: Logger;
 }
 
@@ -34,7 +36,13 @@ export interface PhotoPage {
   totalPages: number;
 }
 
-export function createPhotoService({ prisma, storage, summarizer, logger }: PhotoServiceDeps) {
+export function createPhotoService({
+  prisma,
+  storage,
+  summarizer,
+  describer,
+  logger,
+}: PhotoServiceDeps) {
   async function toView(photo: Photo): Promise<PhotoView> {
     return {
       id: photo.id,
@@ -177,7 +185,34 @@ export function createPhotoService({ prisma, storage, summarizer, logger }: Phot
     return null;
   }
 
-  return { create, list, get, update, remove };
+  // Drafts a description from the picture. Nothing is stored: the user reads it, edits it, and it is
+  // only kept if they save the photo.
+  async function describe(
+    image: UploadedImage,
+    context: { name?: string | undefined; location?: string | undefined },
+  ): Promise<{ description: string }> {
+    if (image.buffer.length > MAX_DESCRIBE_BYTES) {
+      throw payloadTooLarge("Image is too large for an AI description");
+    }
+    try {
+      const description = await describer.describe({
+        buffer: image.buffer,
+        mime: image.mime,
+        name: context.name,
+        location: context.location,
+      });
+      if (description === null) throw aiUnavailable();
+      return { description };
+    } catch (error) {
+      if (error instanceof DescribeError) {
+        logger.warn({ reason: error.message }, "description generation failed");
+        throw aiUnavailable();
+      }
+      throw error;
+    }
+  }
+
+  return { create, list, get, update, remove, describe };
 }
 
 export type PhotoService = ReturnType<typeof createPhotoService>;

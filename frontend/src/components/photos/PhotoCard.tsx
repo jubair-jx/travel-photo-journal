@@ -49,7 +49,12 @@ export function PhotoCard({ photo, onOpen, onEdit, onDelete, onImageError }: Pho
       </button>
       <div className="flex flex-1 flex-col gap-3 p-4">
         {photo.summary ? (
-          <p className="text-sm text-slate-200 italic">&ldquo;{photo.summary}&rdquo;</p>
+          <div className="space-y-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-semibold text-violet-200 ring-1 ring-violet-400/30">
+              <span aria-hidden="true">✨</span> AI summary
+            </span>
+            <p className="text-sm text-slate-200 italic">&ldquo;{photo.summary}&rdquo;</p>
+          </div>
         ) : (
           <p className="line-clamp-3 text-sm text-slate-300">{photo.description}</p>
         )}
