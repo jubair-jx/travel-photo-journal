@@ -1,3 +1,21 @@
+# Local stack: `docker compose up --build`, then open http://localhost:3000.
+#   postgres  database (also the test database, see docker/initdb)
+#   mailpit   catches outgoing mail: http://localhost:8025
+#   migrate   one-shot `prisma migrate deploy`; the API starts only after it succeeds
+#   api       http://localhost:4000
+#   web       http://localhost:3000 (proxies /api/* to the API)
+#
+# For tests only, `docker compose up -d postgres` is enough.
+# Secrets come from a root .env file (see .env.example); compose refuses to start without them.
+
+name: travel-photo-journal
+
+x-api-image: &api-image
+  image: travel-photo-journal-api
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -16,5 +34,65 @@ services:
       timeout: 5s
       retries: 10
 
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  migrate:
+    <<: *api-image
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      # Migrations use the direct (non-pooled) connection; locally that is the same server.
+      DIRECT_URL: postgresql://tpj:tpj@postgres:5432/tpj_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *api-image
+    environment:
+      # Plain http on localhost: a Secure-only cookie would not be stored by every browser.
+      NODE_ENV: development
+      PORT: "4000"
+      LOG_LEVEL: info
+      APP_URL: http://localhost:3000
+      # Browsers load images through the web app's proxy, so file links point there.
+      API_PUBLIC_URL: http://localhost:3000/api
+      TRUST_PROXY: "1"
+      DATABASE_URL: postgresql://tpj:tpj@postgres:5432/tpj_dev
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (see .env.example)}
+      TOTP_ENC_KEY: ${TOTP_ENC_KEY:?Set TOTP_ENC_KEY in .env (see .env.example)}
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      STORAGE_DRIVER: local
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      OPENROUTER_FALLBACK_MODELS: ${OPENROUTER_FALLBACK_MODELS:-}
+    ports:
+      - "4000:4000"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  uploads:
