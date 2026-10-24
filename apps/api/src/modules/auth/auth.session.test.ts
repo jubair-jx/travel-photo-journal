@@ -1,8 +1,10 @@
 import request from "supertest";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { hashToken } from "../../lib/crypto.js";
+import { encryptSecret, hashToken } from "../../lib/crypto.js";
 import { createAccessTokenService } from "../../lib/jwt.js";
+import { newTotpSecret } from "../../lib/totp.js";
 import type { ErrorBody } from "../../middleware/error.js";
+import { authenticatorCode } from "../../test/authenticator.js";
 import { cookieHeader, refreshCookieFrom } from "../../test/cookies.js";
 import { resetDatabase } from "../../test/db.js";
 import { createUser, defaultUser } from "../../test/factories.js";
@@ -186,6 +188,97 @@ describe("POST /auth/logout", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, data: null });
+  });
+});
+
+describe("POST /auth/login with two-factor authentication", () => {
+  const MANUAL_KEY = newTotpSecret();
+  const invalidCredentials = {
+    success: false,
+    error: { code: "INVALID_CREDENTIALS", message: "Invalid email or password" },
+  };
+
+  async function createUserWithTwoFactor(enabled = true) {
+    const user = await createUser(ctx.prisma);
+    await ctx.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        twoFactorSecret: encryptSecret(MANUAL_KEY, testConfig.totpEncryptionKey, user.id),
+        twoFactorEnabled: enabled,
+      },
+    });
+    return user;
+  }
+
+  it("asks for a code when the password is right but no code was sent", async () => {
+    await createUserWithTwoFactor();
+
+    const res = await login();
+
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({
+      success: false,
+      error: { code: "TOTP_REQUIRED", message: "A two-factor authentication code is required" },
+    });
+    expect(refreshCookieFrom(res)).toBeUndefined();
+  });
+
+  it("signs in with the right code", async () => {
+    await createUserWithTwoFactor();
+
+    const res = await login({ ...defaultUser, totpCode: await authenticatorCode(MANUAL_KEY) });
+
+    expect(res.status).toBe(200);
+    expect(refreshCookieFrom(res)).toBeDefined();
+  });
+
+  it("treats a wrong code exactly like a wrong password", async () => {
+    await createUserWithTwoFactor();
+
+    const res = await login({ ...defaultUser, totpCode: await authenticatorCode(MANUAL_KEY, 600) });
+
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual(invalidCredentials);
+    expect(refreshCookieFrom(res)).toBeUndefined();
+  });
+
+  it("does not reveal that 2FA is on to someone without the password", async () => {
+    await createUserWithTwoFactor();
+
+    const noCode = await login({ ...defaultUser, password: "not-the-password" });
+    const withCode = await login({
+      ...defaultUser,
+      password: "not-the-password",
+      totpCode: await authenticatorCode(MANUAL_KEY),
+    });
+
+    expect(noCode.body).toEqual(invalidCredentials);
+    expect(withCode.body).toEqual(invalidCredentials);
+  });
+
+  it("does not ask for a code until 2FA has been confirmed", async () => {
+    await createUserWithTwoFactor(false);
+
+    const res = await login();
+
+    expect(res.status).toBe(200);
+  });
+
+  it("ignores a code sent by a user who has no 2FA", async () => {
+    await createUser(ctx.prisma);
+
+    const res = await login({ ...defaultUser, totpCode: "123456" });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects a malformed code before doing any work", async () => {
+    await createUserWithTwoFactor();
+
+    const res = await login({ ...defaultUser, totpCode: "abc" });
+
+    expect(res.status).toBe(400);
+    expect((res.body as ErrorBody).error.code).toBe("VALIDATION_ERROR");
   });
 });
 
