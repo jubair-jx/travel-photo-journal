@@ -30,7 +30,7 @@ Migrations are forward-only and applied in order; `migrate deploy` never creates
 
 Never commit any of these. Set them in the platform dashboards.
 
-**API (Railway):** `NODE_ENV=production`, `PORT` (Railway sets it), `APP_URL` (the Vercel URL), `TRUST_PROXY=1`, `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `TOTP_ENC_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `STORAGE_DRIVER=s3`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_FALLBACK_MODELS`. Optionally `REFRESH_COOKIE_PATH=/api/auth`.
+**API (Railway):** `NODE_ENV=production`, `PORT` (Railway sets it), `APP_URL` (the Vercel URL), `TRUST_PROXY=1`, `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `TOTP_ENC_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `STORAGE_DRIVER=s3`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `ANTHROPIC_API_KEY` (or `OPENROUTER_API_KEY`), `OPENROUTER_MODEL`, `OPENROUTER_FALLBACK_MODELS`. Optionally `REFRESH_COOKIE_PATH=/api/auth`.
 
 **Web (Vercel):** `API_INTERNAL_URL` set to the API's public URL, and set **before the build**, since rewrites are resolved then. Project root directory `frontend`.
 

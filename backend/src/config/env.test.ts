@@ -121,6 +121,16 @@ describe("loadConfig", () => {
     });
   });
 
+  it("enables the Anthropic summarizer with the cheapest model by default", () => {
+    const config = loadConfig({ ...required, ANTHROPIC_API_KEY: "sk-test" });
+
+    expect(config.summary.anthropic).toEqual({ apiKey: "sk-test", model: "claude-haiku-5-5" });
+  });
+
+  it("leaves Anthropic off without a key", () => {
+    expect(loadConfig(required).summary.anthropic).toBeUndefined();
+  });
+
   it("builds file links from API_PUBLIC_URL when given", () => {
     const config = loadConfig({ ...required, API_PUBLIC_URL: "https://app.example.com/api/" });
 
