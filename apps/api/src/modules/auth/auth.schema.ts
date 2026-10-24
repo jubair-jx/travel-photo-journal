@@ -15,3 +15,8 @@ export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 
 export const resendVerificationSchema = z.object({ email });
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+
+// No length rule on login: the password policy applies when choosing one, and echoing it back here
+// would only help someone probing which passwords are acceptable.
+export const loginSchema = z.object({ email, password: z.string().min(1).max(128) });
+export type LoginInput = z.infer<typeof loginSchema>;

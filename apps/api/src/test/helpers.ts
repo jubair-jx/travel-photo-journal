@@ -14,12 +14,20 @@ export const testConfig: Config = {
   logLevel: "silent",
   trustProxy: 0,
   databaseUrl: testDatabaseUrl,
+  jwt: {
+    secret: "test-only-jwt-secret-that-is-longer-than-32-chars",
+    issuer: "tpj-test",
+    audience: "tpj-test-web",
+  },
+  refreshCookiePath: "/",
   mail: { from: "Journal <no-reply@test.local>", smtp: { host: "localhost", port: 1025 } },
 };
 
 // Limits high enough that ordinary tests never trip them; the rate-limit tests pass their own.
 const generousLimits: AuthRateLimits = {
   register: { windowMs: 60_000, limit: 10_000 },
+  login: { windowMs: 60_000, limit: 10_000 },
+  session: { windowMs: 60_000, limit: 10_000 },
   verifyEmail: { windowMs: 60_000, limit: 10_000 },
   resendVerification: { windowMs: 60_000, limit: 10_000 },
 };
