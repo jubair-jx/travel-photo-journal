@@ -1,8 +1,10 @@
 import type { Config } from "../../config/env.js";
-import { decryptSecret, encryptSecret } from "../../lib/crypto.js";
+import { decryptSecret, encryptSecret, verifyPassword } from "../../lib/crypto.js";
 import {
+  incorrectPassword,
   invalidTotpCode,
   twoFactorAlreadyEnabled,
+  twoFactorNotEnabled,
   twoFactorNotSetUp,
   unauthenticated,
 } from "../../lib/errors.js";
@@ -25,7 +27,13 @@ export function createTwoFactorService({ prisma, config }: TwoFactorServiceDeps)
   async function findUser(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, twoFactorEnabled: true, twoFactorSecret: true },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        twoFactorEnabled: true,
+        twoFactorSecret: true,
+      },
     });
     // A valid access token for a user who has since been deleted.
     if (!user) throw unauthenticated();
@@ -62,7 +70,32 @@ export function createTwoFactorService({ prisma, config }: TwoFactorServiceDeps)
     return { enabled: true };
   }
 
-  return { setup, confirm };
+  async function status(userId: string): Promise<{ enabled: boolean }> {
+    const user = await findUser(userId);
+    return { enabled: user.twoFactorEnabled };
+  }
+
+  // Turning protection off needs the password and a current code, so a stolen access token alone
+  // cannot weaken the account.
+  async function disable(
+    userId: string,
+    { password, code }: { password: string; code: string },
+  ): Promise<{ enabled: false }> {
+    const user = await findUser(userId);
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) throw twoFactorNotEnabled();
+    if (!(await verifyPassword(user.passwordHash, password))) throw incorrectPassword();
+
+    const secret = decryptSecret(user.twoFactorSecret, key, user.id);
+    if (!(await verifyTotp(secret, code))) throw invalidTotpCode();
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { twoFactorEnabled: false, twoFactorSecret: null },
+    });
+    return { enabled: false };
+  }
+
+  return { setup, confirm, status, disable };
 }
 
 export type TwoFactorService = ReturnType<typeof createTwoFactorService>;

@@ -30,6 +30,12 @@ export const totpCodeSchema = z.string().regex(/^\d{6}$/, "Enter the 6-digit cod
 export const twoFactorCodeSchema = z.object({ code: totpCodeSchema });
 export type TwoFactorCodeValues = z.infer<typeof twoFactorCodeSchema>;
 
+export const disableTwoFactorSchema = z.object({
+  password: z.string().min(1, "Enter your password"),
+  code: totpCodeSchema,
+});
+export type DisableTwoFactorValues = z.infer<typeof disableTwoFactorSchema>;
+
 export const resendSchema = z.object({ email });
 export type ResendValues = z.infer<typeof resendSchema>;
 

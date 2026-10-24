@@ -6,6 +6,7 @@ import { createRateLimiter, type RateLimitOptions } from "../../middleware/rate-
 import { validate } from "../../middleware/validate.js";
 import { createAuthController } from "./auth.controller.js";
 import {
+  disableTwoFactorSchema,
   loginSchema,
   registerSchema,
   resendVerificationSchema,
@@ -106,6 +107,21 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
     createRateLimiter(limits.session),
     requireAuth(accessTokens),
     session.revokeAllSessions,
+  );
+
+  router.get(
+    "/2fa",
+    createRateLimiter(limits.session),
+    requireAuth(accessTokens),
+    twoFactor.status,
+  );
+
+  router.post(
+    "/2fa/disable",
+    createRateLimiter(limits.twoFactor),
+    requireAuth(accessTokens),
+    validate(disableTwoFactorSchema, "body"),
+    twoFactor.disable,
   );
 
   router.post(

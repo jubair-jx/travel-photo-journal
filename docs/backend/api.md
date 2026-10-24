@@ -189,6 +189,24 @@ Confirms the first code from the authenticator app and switches 2FA on.
 
 A code is accepted if it is the current one or the one from the adjacent 30-second step (clock drift).
 
+### GET /auth/2fa
+
+Whether two-factor authentication is on for the signed-in user.
+
+- **Auth:** bearer access token. Rate limited like refresh.
+- **200:** `{ "success": true, "data": { "enabled": boolean } }`. A pending, unconfirmed setup counts as `false`.
+
+### POST /auth/2fa/disable
+
+Turns two-factor authentication off and erases the stored secret.
+
+- **Auth:** bearer access token. Rate limited like the other 2FA routes (10 per 15 minutes).
+- **Body:** `{ "password": string, "code": "123456" }`. Both are required, so a stolen access token alone cannot weaken the account.
+- **200:** `{ "success": true, "data": { "enabled": false } }`.
+- **403 `INCORRECT_PASSWORD`:** the password is wrong. 403 rather than 401 so the client does not mistake it for an expired session.
+- **400 `INVALID_TOTP_CODE`:** the code does not match.
+- **409 `TWO_FACTOR_NOT_ENABLED`:** there is nothing to turn off.
+
 ### Login with 2FA
 
 `POST /auth/login` accepts an optional `totpCode` (six digits). Once 2FA is enabled:

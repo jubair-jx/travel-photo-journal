@@ -133,12 +133,12 @@ export function LoginForm() {
         error={errors.password?.message}
         {...register("password")}
       />
-      <label className="flex items-center gap-2 text-sm text-slate-300">
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
         <input
           type="checkbox"
           checked={remember}
           onChange={(event) => setRemember(event.target.checked)}
-          className="size-4 rounded border-white/20 bg-white/5 accent-orange-500"
+          className="size-4 cursor-pointer rounded border-white/20 bg-white/5 accent-orange-500"
         />
         Remember my email on this device
       </label>

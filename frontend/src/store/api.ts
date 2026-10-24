@@ -100,7 +100,7 @@ export interface Credentials {
 export const api = createApi({
   reducerPath: "api",
   baseQuery,
-  tagTypes: ["Photo", "Session"],
+  tagTypes: ["Photo", "Session", "TwoFactor"],
   endpoints: (build) => ({
     register: build.mutation<{ email: string }, { email: string; password: string }>({
       query: (body) => ({ url: "/auth/register", method: "POST", body }),
@@ -159,8 +159,17 @@ export const api = createApi({
     setupTwoFactor: build.mutation<TwoFactorSetup, void>({
       query: () => ({ url: "/auth/2fa/setup", method: "POST" }),
     }),
+    twoFactorStatus: build.query<{ enabled: boolean }, void>({
+      query: () => "/auth/2fa",
+      providesTags: ["TwoFactor"],
+    }),
     verifyTwoFactor: build.mutation<{ enabled: true }, { code: string }>({
       query: (body) => ({ url: "/auth/2fa/verify", method: "POST", body }),
+      invalidatesTags: ["TwoFactor"],
+    }),
+    disableTwoFactor: build.mutation<{ enabled: false }, { password: string; code: string }>({
+      query: (body) => ({ url: "/auth/2fa/disable", method: "POST", body }),
+      invalidatesTags: ["TwoFactor"],
     }),
     listPhotos: build.query<PhotoPage, { page: number; limit?: number }>({
       query: ({ page, limit = 12 }) => ({ url: "/photos", params: { page, limit } }),
@@ -191,7 +200,9 @@ export const {
   useRevokeSessionMutation,
   useRevokeAllSessionsMutation,
   useSetupTwoFactorMutation,
+  useTwoFactorStatusQuery,
   useVerifyTwoFactorMutation,
+  useDisableTwoFactorMutation,
   useListPhotosQuery,
   useCreatePhotoMutation,
   useUpdatePhotoMutation,
