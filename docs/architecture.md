@@ -1,3 +1,43 @@
 # Architecture
 
-_To be written._
+## Shape
+
+An npm-workspaces monorepo: `apps/api` (Express, TypeScript, Prisma) and `apps/web` (Next.js). The web app proxies `/api/*` to the API so that the refresh cookie is same-origin (ADR-0004).
+
+## API composition
+
+`createApp(deps)` is the single place the application is assembled. It receives its collaborators as arguments (config, logger now; mailer, storage and summarizer in later slices) and returns an Express app. Nothing reads `process.env` or constructs a client at import time, so tests build an app with fakes and production builds one with real implementations (ADR-0001).
+
+`server.ts` is the only entrypoint: it loads and validates configuration, builds the logger and app, listens, and shuts down on SIGTERM/SIGINT.
+
+### Request pipeline
+
+Order matters; each step relies on the ones before it.
+
+1. **Request logger**: assigns a fresh request id (also sent as `X-Request-Id`) and logs one line per request with method, path and status only.
+2. **helmet**: security headers.
+3. **CORS**: exact match on the web app origin, with credentials.
+4. **JSON body parser**: 100 KB limit. Parse and size failures are translated to 400/413 envelopes by the error handler.
+5. **Routes**: feature modules (health today; auth and photos in later slices).
+6. **Not-found handler**: unmatched routes become a `NOT_FOUND` error.
+7. **Error handler**: the only place that turns an exception into a response.
+
+### Errors
+
+Code anywhere in the request path throws or forwards an `AppError(status, code, message, details?)`. The error handler also recognises Zod validation errors (400) and body-parser errors (400/413). Anything else is logged with the request id and answered with a generic 500, so internals never reach a client.
+
+### Validation
+
+`validate(schema, source)` parses `body`, `query` or `params`, replaces the request's value with the parsed result (so handlers see coerced, trimmed, stripped data), and forwards failures to the error handler. Unknown fields are dropped by the schemas, which is how a client-supplied photo summary is ignored.
+
+### Configuration
+
+`loadConfig(env)` validates an env object and returns a typed config. It takes the env as an argument, so it is tested without touching `process.env`. On failure it throws an error naming the variables and reasons, never the values. Each slice adds the variables it needs.
+
+### Logging
+
+pino, with path-based redaction for password, token, authorization, cookie and Set-Cookie fields at several depths, and request/response serializers that log only what is needed. Redaction is the second line of defence; the serializers are the first.
+
+## Testing approach
+
+Vitest and supertest drive the app through HTTP. Infrastructure modules are tested through their public interface (a throwaway Express app for middleware, a captured stream for the logger). The database harness arrives with the first model.
