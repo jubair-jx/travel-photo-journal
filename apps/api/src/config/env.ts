@@ -16,7 +16,35 @@ export interface Config {
     from: string;
     smtp: { host: string; port: number; user?: string; pass?: string };
   };
+  storage: StorageConfig;
+  summary: {
+    apiKey?: string;
+    // Primary model first, then fallbacks. Empty means summaries are off.
+    models: string[];
+    baseUrl: string;
+    deadlineMs: number;
+  };
 }
+
+export type StorageConfig =
+  | { driver: "local"; directory: string; publicBaseUrl: string; urlTtlSeconds: number }
+  | {
+      driver: "r2";
+      accountId: string;
+      accessKeyId: string;
+      secretAccessKey: string;
+      bucket: string;
+      urlTtlSeconds: number;
+    };
+
+const R2_KEYS = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"] as const;
+
+// Comma-separated list from an env var; blanks and stray commas are ignored.
+const splitList = (value: string | undefined): string[] =>
+  (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 
 const envSchema = z
   .object({
@@ -46,13 +74,38 @@ const envSchema = z
     SMTP_USER: z.string().min(1).optional(),
     SMTP_PASS: z.string().min(1).optional(),
     MAIL_FROM: z.string().min(1).optional(),
+    STORAGE_DRIVER: z.enum(["local", "r2"]).default("local"),
+    LOCAL_STORAGE_DIR: z.string().min(1).default("./uploads"),
+    // Where browsers reach this API; local file links are built from it.
+    API_PUBLIC_URL: z.url().optional(),
+    SIGNED_URL_TTL_SECONDS: z.coerce.number().int().min(30).max(86_400).default(900),
+    R2_ACCOUNT_ID: z.string().min(1).optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    R2_BUCKET: z.string().min(1).optional(),
+    OPENROUTER_API_KEY: z.string().min(1).optional(),
+    OPENROUTER_MODEL: z.string().min(1).optional(),
+    OPENROUTER_FALLBACK_MODELS: z.string().optional(),
+    OPENROUTER_BASE_URL: z.url().default("https://openrouter.ai/api/v1"),
   })
-  // The local defaults point at a mail catcher; running production on them would silently drop mail.
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV !== "production") return;
-    for (const key of ["SMTP_HOST", "MAIL_FROM"] as const) {
-      if (env[key] === undefined) {
-        ctx.addIssue({ code: "custom", path: [key], message: "Required in production" });
+    // The local defaults point at a mail catcher; running production on them would silently drop mail.
+    if (env.NODE_ENV === "production") {
+      for (const key of ["SMTP_HOST", "MAIL_FROM"] as const) {
+        if (env[key] === undefined) {
+          ctx.addIssue({ code: "custom", path: [key], message: "Required in production" });
+        }
+      }
+    }
+    if (env.STORAGE_DRIVER === "r2") {
+      for (const key of R2_KEYS) {
+        if (env[key] === undefined) {
+          ctx.addIssue({
+            code: "custom",
+            path: [key],
+            message: 'Required when STORAGE_DRIVER is "r2"',
+          });
+        }
       }
     }
   });
@@ -94,5 +147,43 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
         ...(data.SMTP_PASS !== undefined && { pass: data.SMTP_PASS }),
       },
     },
+    storage: buildStorageConfig(data),
+    summary: {
+      ...(data.OPENROUTER_API_KEY !== undefined && { apiKey: data.OPENROUTER_API_KEY }),
+      models: [
+        ...(data.OPENROUTER_MODEL ? [data.OPENROUTER_MODEL] : []),
+        ...splitList(data.OPENROUTER_FALLBACK_MODELS),
+      ],
+      baseUrl: data.OPENROUTER_BASE_URL,
+      // One deadline for the whole attempt across all models (ADR-0006).
+      deadlineMs: 8000,
+    },
+  };
+}
+
+function buildStorageConfig(data: z.output<typeof envSchema>): StorageConfig {
+  if (
+    data.STORAGE_DRIVER === "r2" &&
+    data.R2_ACCOUNT_ID &&
+    data.R2_ACCESS_KEY_ID &&
+    data.R2_SECRET_ACCESS_KEY &&
+    data.R2_BUCKET
+  ) {
+    return {
+      driver: "r2",
+      accountId: data.R2_ACCOUNT_ID,
+      accessKeyId: data.R2_ACCESS_KEY_ID,
+      secretAccessKey: data.R2_SECRET_ACCESS_KEY,
+      bucket: data.R2_BUCKET,
+      urlTtlSeconds: data.SIGNED_URL_TTL_SECONDS,
+    };
+  }
+  // A path is kept (e.g. "https://site/api" behind the web proxy), without a trailing slash.
+  const base = new URL(data.API_PUBLIC_URL ?? `http://localhost:${data.PORT}`);
+  return {
+    driver: "local",
+    directory: data.LOCAL_STORAGE_DIR,
+    publicBaseUrl: `${base.origin}${base.pathname.replace(/\/+$/, "")}`,
+    urlTtlSeconds: data.SIGNED_URL_TTL_SECONDS,
   };
 }

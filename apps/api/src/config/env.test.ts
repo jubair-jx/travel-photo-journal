@@ -27,6 +27,17 @@ describe("loadConfig", () => {
       },
       refreshCookiePath: "/",
       totpEncryptionKey: Buffer.alloc(32, 7),
+      storage: {
+        driver: "local",
+        directory: "./uploads",
+        publicBaseUrl: "http://localhost:4000",
+        urlTtlSeconds: 900,
+      },
+      summary: {
+        models: [],
+        baseUrl: "https://openrouter.ai/api/v1",
+        deadlineMs: 8000,
+      },
       mail: {
         from: "Travel Photo Journal <no-reply@localhost>",
         smtp: { host: "localhost", port: 1025 },
@@ -77,6 +88,51 @@ describe("loadConfig", () => {
       expect(message).toContain("APP_URL");
       expect(message).not.toContain("s3cr3t");
     }
+  });
+
+  it("reads R2 and summary settings, splitting the fallback model list", () => {
+    const config = loadConfig({
+      ...required,
+      STORAGE_DRIVER: "r2",
+      R2_ACCOUNT_ID: "acct",
+      R2_ACCESS_KEY_ID: "key-id",
+      R2_SECRET_ACCESS_KEY: "key-secret",
+      R2_BUCKET: "photos",
+      SIGNED_URL_TTL_SECONDS: "300",
+      OPENROUTER_API_KEY: "or-key",
+      OPENROUTER_MODEL: "vendor/main:free",
+      OPENROUTER_FALLBACK_MODELS: " vendor/b:free , vendor/c:free ,",
+    });
+
+    expect(config.storage).toEqual({
+      driver: "r2",
+      accountId: "acct",
+      accessKeyId: "key-id",
+      secretAccessKey: "key-secret",
+      bucket: "photos",
+      urlTtlSeconds: 300,
+    });
+    expect(config.summary).toMatchObject({
+      apiKey: "or-key",
+      models: ["vendor/main:free", "vendor/b:free", "vendor/c:free"],
+    });
+  });
+
+  it("builds file links from API_PUBLIC_URL when given", () => {
+    const config = loadConfig({ ...required, API_PUBLIC_URL: "https://app.example.com/api/" });
+
+    expect(config.storage).toMatchObject({
+      driver: "local",
+      publicBaseUrl: "https://app.example.com/api",
+    });
+  });
+
+  it("will not select R2 without its credentials", () => {
+    const attempt = () => loadConfig({ ...required, STORAGE_DRIVER: "r2", R2_BUCKET: "photos" });
+
+    expect(attempt).toThrow(/R2_ACCOUNT_ID/);
+    expect(attempt).toThrow(/R2_SECRET_ACCESS_KEY/);
+    expect(attempt).not.toThrow(/R2_BUCKET/);
   });
 
   it("rejects a short JWT secret without echoing it", () => {
