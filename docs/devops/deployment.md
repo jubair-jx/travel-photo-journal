@@ -8,7 +8,7 @@
 | API      | Railway (Docker)              | Built from `backend/Dockerfile` with `backend/` as the context. Services do not sleep by default; verify Railway's current trial and plan terms, since a paid plan may be needed if the review falls after a trial ends. |
 | Database | Neon Postgres                 | Pooled `DATABASE_URL` for the app, direct `DIRECT_URL` for migrations.                                                                                                                                                   |
 | Images   | Neon Object Storage (private) | Accessed through the storage interface; signed URLs only.                                                                                                                                                                |
-| Email    | Brevo SMTP                    | Mailpit locally.                                                                                                                                                                                                         |
+| Email    | Brevo HTTPS API               | Mailpit (SMTP) locally. Production uses the API because free hosts block SMTP ports.                                                                                                                                     |
 
 Tests run against Postgres in compose and in CI; Neon is not used for tests.
 
@@ -57,4 +57,4 @@ The Railway service stays running, so the API itself has no cold start. The Neon
 
 - **Upload size through Vercel's rewrite.** Vercel documents a 4.5 MB request body limit for its serverless functions. Rewrites to an external origin are normally proxied without that limit, but if a 10 MB upload fails with a 413 from Vercel (not from the API), lower the client-side image limit to 4 MB (and the API limit with it), or send uploads straight to the API with CORS enabled.
 - **Cookies.** The refresh cookie must be set on the Vercel domain, Secure, httpOnly, `SameSite=Lax`.
-- **Email.** Brevo requires a verified sender address; `MAIL_FROM` must match it.
+- **Email.** Set `BREVO_API_KEY` and `MAIL_FROM`; the sender address must be verified in Brevo (Senders & IP). Free web hosts (Render's included) block outbound SMTP on ports 25, 465 and 587, which is why production mail goes over the HTTPS API; `SMTP_*` is only needed when `BREVO_API_KEY` is not set.
