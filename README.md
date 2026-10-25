@@ -26,7 +26,7 @@ A private journal for travel photos. Register, verify your email, sign in (optio
 | Passwords  | argon2id                                                                  | Memory-hard, recommended by OWASP ([ADR-0003](docs/adr/0003-argon2id-for-password-hashing.md)).                                                                                                                    |
 | Sessions   | 15-minute JWT (HS256) plus a rotating refresh token in an httpOnly cookie | Limits what a stolen access token is worth while keeping long sessions revocable ([ADR-0004](docs/adr/0004-refresh-token-rotation-in-httponly-cookie.md), [ADR-0009](docs/adr/0009-refresh-session-mechanics.md)). |
 | Images     | Neon Object Storage (private, S3-compatible) behind a storage interface   | No public URLs, cheap egress, and a local-disk driver for development and tests ([ADR-0005](docs/adr/0005-r2-behind-a-storage-interface.md)).                                                                      |
-| Email      | SMTP via nodemailer: Brevo in production, Mailpit locally                 | A real relay with a free tier, and a mail catcher so nothing external is needed in development.                                                                                                                    |
+| Email      | Resend HTTPS API in production, SMTP (Mailpit) locally                    | A real relay with a free tier, and a mail catcher so nothing external is needed in development.                                                                                                                    |
 | Web        | Next.js (App Router), Tailwind CSS, Framer Motion                         | Simple pages, utility-class styling, light motion that respects reduced-motion settings.                                                                                                                           |
 | Web data   | Redux Toolkit with RTK Query; react-hook-form and zod                     | Caching and one place for auth, errors and silent refresh ([ADR-0011](docs/adr/0011-web-client-state-and-session.md)).                                                                                             |
 | Tests      | Vitest, supertest, a real Postgres                                        | Integration tests exercise the real routes and database; external services are replaced through their interfaces.                                                                                                  |
@@ -46,7 +46,7 @@ flowchart LR
   Web -->|"/api/* rewrite"| API["Express API<br/>(Railway, Docker)"]
   API -->|"Prisma, pooled"| DB[("Neon Postgres")]
   API -->|"S3 API, signed URLs"| R2[("Neon Object Storage<br/>private bucket")]
-  API -->|"SMTP"| Mail["Brevo"]
+  API -->|"HTTPS"| Mail["Resend"]
   API -->|"HTTPS, 8 s deadline"| Summaries["Summary provider<br/>(Anthropic or OpenRouter)"]
   Browser -.->|"signed image links"| R2
 ```
@@ -112,7 +112,7 @@ Empty values count as unset. Only the first four are required; the rest have def
 | `DIRECT_URL`                                                                                               | Direct connection, used only by `prisma migrate`                                                                  |
 | `NODE_ENV`, `PORT`, `LOG_LEVEL`, `TRUST_PROXY`                                                             | Runtime behavior (`production` makes the refresh cookie Secure)                                                   |
 | `JWT_ISSUER`, `JWT_AUDIENCE`, `REFRESH_COOKIE_PATH`                                                        | Token claims and cookie path                                                                                      |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`                                            | Outgoing mail (Mailpit locally, Brevo in production)                                                              |
+| `RESEND_API_KEY`, `MAIL_FROM`, `SMTP_*`                                                                    | Mail over Resend (production); SMTP (Mailpit) when no key                                                         |
 | `STORAGE_DRIVER`, `LOCAL_STORAGE_DIR`, `API_PUBLIC_URL`                                                    | `local` (disk) or `s3`; where the local driver writes and how its links are built                                 |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_FORCE_PATH_STYLE` | Required when `STORAGE_DRIVER=s3`                                                                                 |
 | `SIGNED_URL_TTL_SECONDS`                                                                                   | Lifetime of image links (default 900)                                                                             |

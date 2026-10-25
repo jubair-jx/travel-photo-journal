@@ -39,20 +39,12 @@ export function createSmtpMailer({ from, smtp }: Config["mail"]): Mailer {
   return new NodemailerMailer(transport, from);
 }
 
-// "Journal <hello@example.com>" -> { name, email }; a bare address has no name.
-export function parseSender(from: string): { name?: string; email: string } {
-  const match = /^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(from);
-  if (!match?.[2]) return { email: from.trim() };
-  const name = match[1]?.trim();
-  return name ? { name, email: match[2].trim() } : { email: match[2].trim() };
-}
-
-const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
+const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 // Sends over HTTPS instead of SMTP. Free hosting tiers (Render's included) block the SMTP ports, so
-// an API call on port 443 is the only thing that works there. The sender address must be verified
-// in the Brevo account.
-export class BrevoMailer implements Mailer {
+// an API call on port 443 is the only thing that works there. `from` must be on a domain verified
+// in the Resend account; Resend accepts "Name <address>" as is.
+export class ResendMailer implements Mailer {
   constructor(
     private readonly options: {
       apiKey: string;
@@ -64,28 +56,27 @@ export class BrevoMailer implements Mailer {
 
   async send(message: MailMessage): Promise<void> {
     const doFetch = this.options.fetchImpl ?? fetch;
-    const response = await doFetch(BREVO_ENDPOINT, {
+    const response = await doFetch(RESEND_ENDPOINT, {
       method: "POST",
       headers: {
-        "api-key": this.options.apiKey,
+        authorization: `Bearer ${this.options.apiKey}`,
         "content-type": "application/json",
-        accept: "application/json",
       },
       body: JSON.stringify({
-        sender: parseSender(this.options.from),
-        to: [{ email: message.to }],
+        from: this.options.from,
+        to: [message.to],
         subject: message.subject,
-        htmlContent: message.html,
-        textContent: message.text,
+        html: message.html,
+        text: message.text,
       }),
       signal: AbortSignal.timeout(this.options.timeoutMs ?? 10_000),
     });
     // The status only: the reply can echo the recipient and message.
-    if (!response.ok) throw new Error(`Brevo rejected the message (status ${response.status})`);
+    if (!response.ok) throw new Error(`Resend rejected the message (status ${response.status})`);
   }
 }
 
 export function createMailer(mail: Config["mail"]): Mailer {
-  if (mail.brevoApiKey) return new BrevoMailer({ apiKey: mail.brevoApiKey, from: mail.from });
+  if (mail.resendApiKey) return new ResendMailer({ apiKey: mail.resendApiKey, from: mail.from });
   return createSmtpMailer(mail);
 }
