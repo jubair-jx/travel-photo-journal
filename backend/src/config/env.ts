@@ -14,6 +14,8 @@ export interface Config {
   totpEncryptionKey: Buffer;
   mail: {
     from: string;
+    // When set, mail goes out through Brevo's HTTPS API instead of SMTP.
+    brevoApiKey?: string;
     smtp: { host: string; port: number; user?: string; pass?: string };
   };
   storage: StorageConfig;
@@ -79,6 +81,7 @@ const envSchema = z
       .regex(/^[A-Za-z0-9+/]+={0,2}$/, "Must be base64")
       .transform((value) => Buffer.from(value, "base64"))
       .refine((key) => key.length === 32, "Must decode to exactly 32 bytes"),
+    BREVO_API_KEY: z.string().min(1).optional(),
     SMTP_HOST: z.string().min(1).optional(),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(1025),
     SMTP_USER: z.string().min(1).optional(),
@@ -109,7 +112,11 @@ const envSchema = z
   .superRefine((env, ctx) => {
     // The local defaults point at a mail catcher; running production on them would silently drop mail.
     if (env.NODE_ENV === "production") {
-      for (const key of ["SMTP_HOST", "MAIL_FROM"] as const) {
+      // With an HTTPS mail API there is no SMTP host to require.
+      const required = env.BREVO_API_KEY
+        ? (["MAIL_FROM"] as const)
+        : (["SMTP_HOST", "MAIL_FROM"] as const);
+      for (const key of required) {
         if (env[key] === undefined) {
           ctx.addIssue({ code: "custom", path: [key], message: "Required in production" });
         }
@@ -162,6 +169,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     totpEncryptionKey: data.TOTP_ENC_KEY,
     mail: {
       from: data.MAIL_FROM ?? "Travel Photo Journal <no-reply@localhost>",
+      ...(data.BREVO_API_KEY !== undefined && { brevoApiKey: data.BREVO_API_KEY }),
       smtp: {
         host: data.SMTP_HOST ?? "localhost",
         port: data.SMTP_PORT,

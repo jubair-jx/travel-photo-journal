@@ -2,7 +2,7 @@ import "dotenv/config";
 import { createApp } from "./app.js";
 import { ConfigError, loadConfig } from "./config/env.js";
 import { createLogger } from "./lib/logger.js";
-import { createSmtpMailer } from "./lib/mailer.js";
+import { createMailer } from "./lib/mailer.js";
 import { createPrismaClient } from "./lib/prisma.js";
 import { createStorage } from "./lib/storage.factory.js";
 import { createDescriber } from "./lib/describer.js";
@@ -12,7 +12,7 @@ function main(): void {
   const config = loadConfig(process.env);
   const logger = createLogger(config.logLevel);
   const prisma = createPrismaClient(config.databaseUrl);
-  const mailer = createSmtpMailer(config.mail);
+  const mailer = createMailer(config.mail);
   const server = createApp({
     config,
     logger,
