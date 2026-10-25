@@ -140,7 +140,7 @@ A web application and REST API where a person registers, verifies their email, s
 
 - Docker images for the API and web app and a compose file with Postgres, API, web and a mail catcher; migrations run on release.
 - CI runs install, format check, lint, typecheck, tests against a Postgres service, build and a dependency audit.
-- Production: API on Railway, web on Vercel, Neon for data and images, Brevo for mail.
+- Production: API on Render (Docker), web on Vercel, Neon for data and images, Resend for mail.
 
 ## Testing Decisions
 

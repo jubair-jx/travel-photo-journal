@@ -205,12 +205,12 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...required, NODE_ENV: "production" })).toThrow(/SMTP_HOST/);
   });
 
-  it("accepts the Brevo API in production in place of an SMTP host, but still needs a sender", () => {
-    const production = { ...required, NODE_ENV: "production", BREVO_API_KEY: "key" };
+  it("accepts the Resend API in production in place of an SMTP host, but still needs a sender", () => {
+    const production = { ...required, NODE_ENV: "production", RESEND_API_KEY: "key" };
 
     expect(() => loadConfig(production)).toThrow(/MAIL_FROM/);
     expect(() => loadConfig(production)).not.toThrow(/SMTP_HOST/);
     const config = loadConfig({ ...production, MAIL_FROM: "Journal <me@example.com>" });
-    expect(config.mail).toMatchObject({ brevoApiKey: "key", from: "Journal <me@example.com>" });
+    expect(config.mail).toMatchObject({ resendApiKey: "key", from: "Journal <me@example.com>" });
   });
 });
