@@ -51,7 +51,7 @@ Each module owns its HTTP surface and business logic:
 
 ## Data and mail
 
-Prisma is the only database access (pooled URL at runtime, direct URL for migrations; see backend/database.md). Outbound email goes through the `Mailer` interface; the SMTP implementation targets Mailpit locally and Brevo in production, and tests substitute a recording fake.
+Prisma is the only database access (pooled URL at runtime, direct URL for migrations; see backend/database.md). Outbound email goes through the `Mailer` interface; there are two implementations, SMTP (Mailpit locally) and the Resend HTTPS API (production, since free hosts block SMTP ports), and tests substitute a recording fake.
 
 `photos` provides create, list, read, update and delete for a user's own photos; its service takes the storage and summarizer interfaces as dependencies.
 

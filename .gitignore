@@ -19,9 +19,6 @@ Thumbs.db
 .idea/
 .vscode/
 
-# local tooling
-.claude/
-AGENTS.md
 next-env.d.ts
 
 # prisma client output
