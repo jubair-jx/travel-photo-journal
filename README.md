@@ -1,5 +1,14 @@
 # Travel Photo Journal
 
+> [!IMPORTANT]
+> **Please read first: the server is on a free plan and sleeps when idle.**
+>
+> The API runs on a free hosting tier, so after a quiet period it has to wake up. The **first load can take up to a minute** (sometimes the first sign-in or registration as well). This is not a bug.
+>
+> - Please **wait a moment**. The app shows a "Waking up the server" message while it starts.
+> - If the page looks stuck or shows an error, do a **hard refresh** (Windows/Linux: `Ctrl + Shift + R`, macOS: `Cmd + Shift + R`) and try again.
+> - Once it is awake, everything responds normally.
+
 A private journal for travel photos. Register, verify your email, sign in (optionally with two-factor authentication), and keep your own collection of photos with a name, a location, a description and an automatically generated summary. Nobody else can see or change what you store.
 
 | Part | Link                                                          |
@@ -7,8 +16,6 @@ A private journal for travel photos. Register, verify your email, sign in (optio
 | Web  | https://travel-photo-journal.vercel.app                       |
 | API  | https://travel-photo-journal-api.onrender.com (`GET /health`) |
 | Docs | [`docs/`](docs/README.md)                                     |
-
-The API runs on a free hosting plan that sleeps when idle, so the first request after a quiet period can take up to a minute. The web app says so while it waits.
 
 ## Try it
 
