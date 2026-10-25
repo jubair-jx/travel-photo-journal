@@ -2,11 +2,11 @@
 
 A private journal for travel photos. Register, verify your email, sign in (optionally with two-factor authentication), and keep your own collection of photos with a name, a location, a description and an automatically generated summary. Nobody else can see or change what you store.
 
-| Part | Link                                         |
-| ---- | -------------------------------------------- |
-| Web  | _Live URL: added at release_                 |
-| API  | _Live URL: added at release_ (`GET /health`) |
-| Docs | [`docs/`](docs/README.md)                    |
+| Part | Link                                                          |
+| ---- | ------------------------------------------------------------- |
+| Web  | https://travel-photo-journal.vercel.app                       |
+| API  | https://travel-photo-journal-api.onrender.com (`GET /health`) |
+| Docs | [`docs/`](docs/README.md)                                     |
 
 ## Features
 
