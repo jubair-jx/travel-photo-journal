@@ -119,7 +119,7 @@ Exchanges the refresh cookie for a new access token and a new refresh cookie.
 
 - **Auth:** the refresh cookie; no body. Rate limited (120 per 15 minutes per client IP).
 - **200:** same body as login. The old refresh token is retired.
-- **401 `INVALID_REFRESH_TOKEN`:** missing, unknown, expired or already-used cookie. The response clears the cookie. If the token had already been used, every token issued after it in that session is revoked as well (theft response; see ADR-0009).
+- **401 `INVALID_REFRESH_TOKEN`:** missing, unknown, expired or already-used cookie. The response clears the cookie. If the token had already been used, every token issued after it in that session is revoked as well (theft response; see ADR-0009). Exception: a token presented again within 10 seconds of its rotation, before its successor was used, is treated as a retry of a lost response and answered with a fresh token.
 
 ### POST /auth/logout
 

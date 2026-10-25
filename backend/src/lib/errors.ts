@@ -56,6 +56,11 @@ export const twoFactorNotEnabled = (): AppError =>
 export const incorrectPassword = (): AppError =>
   new AppError(403, "INCORRECT_PASSWORD", "That password is not correct");
 
+// 503: the database could not be reached or answered too slowly (a cold or distant serverless
+// instance, a saturated pool). Worth retrying, unlike a 500, and the web app says so.
+export const databaseUnavailable = (): AppError =>
+  new AppError(503, "SERVICE_UNAVAILABLE", "The service is busy right now. Please try again");
+
 export const payloadTooLarge = (message = "Request body is too large"): AppError =>
   new AppError(413, "PAYLOAD_TOO_LARGE", message);
 

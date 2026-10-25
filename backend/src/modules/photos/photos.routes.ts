@@ -5,7 +5,12 @@ import { createRateLimiter } from "../../middleware/rate-limit.js";
 import { acceptImage } from "../../middleware/upload.js";
 import { validate } from "../../middleware/validate.js";
 import { createPhotoController } from "./photos.controller.js";
-import { describeFieldsSchema, listQuerySchema, photoFieldsSchema } from "./photos.schema.js";
+import {
+  describeFieldsSchema,
+  listQuerySchema,
+  photoFieldsSchema,
+  photoUpdateSchema,
+} from "./photos.schema.js";
 import type { PhotoService } from "./photos.service.js";
 
 export function createPhotosRouter(
@@ -28,7 +33,7 @@ export function createPhotosRouter(
     controller.describe,
   );
   router.get("/:id", controller.get);
-  router.put("/:id", acceptImage, validate(photoFieldsSchema, "body"), controller.update);
+  router.put("/:id", acceptImage, validate(photoUpdateSchema, "body"), controller.update);
   router.delete("/:id", controller.remove);
 
   return router;

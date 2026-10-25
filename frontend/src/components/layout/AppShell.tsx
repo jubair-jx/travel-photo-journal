@@ -6,6 +6,7 @@ import { useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/layout/Logo";
+import { ServiceDown } from "@/components/layout/ServiceDown";
 import { FullPageSpinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
 import { useLogoutMutation } from "@/store/api";
@@ -28,6 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (status === "anonymous") router.replace("/login");
   }, [status, router]);
 
+  if (status === "unavailable") return <ServiceDown />;
   if (status !== "authenticated") return <FullPageSpinner />;
 
   const signOut = async () => {

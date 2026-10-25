@@ -207,6 +207,19 @@ describe("silent refresh on 401", () => {
     expect(calls.map((c) => c.route)).toEqual(["GET /photos", "POST /auth/refresh"]);
   });
 
+  it("keeps the user signed in when the refresh fails only because the server is down", async () => {
+    installServer({
+      "GET /photos": () => fail(401, "UNAUTHENTICATED"),
+      "POST /auth/refresh": () => fail(503, "SERVICE_UNAVAILABLE"),
+    });
+    const { store } = signedIn("token-1");
+
+    const result = await store.dispatch(api.endpoints.listPhotos.initiate({ page: 1 }));
+
+    expect(result.error).toMatchObject({ status: 401 });
+    expect(store.getState().auth.status).toBe("unavailable");
+  });
+
   it("does not leave a second request stuck in a retry loop if the retry also fails", async () => {
     installServer({
       "GET /photos": () => fail(401, "UNAUTHENTICATED"),
@@ -242,6 +255,55 @@ describe("restoring a session after a page load", () => {
     await restoreSession(store.dispatch);
 
     expect(store.getState().auth.status).toBe("anonymous");
+  });
+
+  it.each([
+    ["a server error", () => fail(500, "INTERNAL_ERROR")],
+    ["an overloaded database (503)", () => fail(503, "SERVICE_UNAVAILABLE")],
+    ["rate limiting (429)", () => fail(429, "RATE_LIMITED")],
+  ])("does not sign the user out when the refresh answers with %s", async (_label, reply) => {
+    installServer({ "POST /auth/refresh": reply });
+    const { store } = makeStore(memoryStorage());
+
+    const renewed = await restoreSession(store.dispatch);
+
+    expect(renewed).toBe(false);
+    expect(store.getState().auth).toMatchObject({ status: "unavailable", accessToken: null });
+  });
+
+  it("treats a non-JSON error page (a proxy that cannot reach the API) as unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("Internal Server Error", { status: 500 })),
+    );
+    const { store } = makeStore(memoryStorage());
+
+    await restoreSession(store.dispatch);
+
+    expect(store.getState().auth.status).toBe("unavailable");
+  });
+
+  it("treats no network at all as unavailable, not as signed out", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    const { store } = makeStore(memoryStorage());
+
+    await restoreSession(store.dispatch);
+
+    expect(store.getState().auth.status).toBe("unavailable");
+  });
+
+  it("recovers once the server is back: a retry signs in", async () => {
+    installServer({
+      "POST /auth/refresh": (n) =>
+        n === 1 ? fail(503, "SERVICE_UNAVAILABLE") : ok(session("back")),
+    });
+    const { store } = makeStore(memoryStorage());
+
+    await restoreSession(store.dispatch);
+    expect(store.getState().auth.status).toBe("unavailable");
+    await restoreSession(store.dispatch);
+
+    expect(store.getState().auth).toMatchObject({ status: "authenticated", accessToken: "back" });
   });
 
   it("makes one request when called repeatedly (React strict mode runs effects twice)", async () => {

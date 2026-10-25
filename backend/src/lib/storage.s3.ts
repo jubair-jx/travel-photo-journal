@@ -33,6 +33,9 @@ export function createS3Client({
     region,
     forcePathStyle,
     credentials: { accessKeyId, secretAccessKey },
+    // Without these a stalled connection to the bucket would hang the request indefinitely.
+    requestHandler: { connectionTimeout: 5_000, requestTimeout: 30_000 },
+    maxAttempts: 2,
   });
 }
 

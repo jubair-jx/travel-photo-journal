@@ -52,6 +52,11 @@ export function PhotosView() {
     void refetch();
   }, [refetch]);
 
+  // Photos can disappear from under a page (deleted in another tab, or the last one on this page),
+  // leaving it empty while earlier pages still have content. Step back to the last real page.
+  // Adjusting state while rendering is the supported way to derive it from a query result.
+  if (data && data.items.length === 0 && page > 1) setPage(Math.max(1, data.totalPages));
+
   return (
     <div>
       <div className="mb-10 flex flex-wrap items-end justify-between gap-4">

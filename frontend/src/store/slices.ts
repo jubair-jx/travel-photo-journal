@@ -4,8 +4,10 @@ import type { AuthPayload, User } from "../lib/types";
 // Memory only. This slice is deliberately never persisted: the access token must not reach
 // localStorage, where any injected script could read it (ADR-0004).
 export interface AuthState {
-  // "unknown" until the first silent refresh settles after a page load.
-  status: "unknown" | "authenticated" | "anonymous";
+  // "unknown" until the first silent refresh settles after a page load. "unavailable" means the
+  // server could not be asked (offline, down, overloaded): the user may well still have a session,
+  // so they are offered a retry instead of being sent to sign in again.
+  status: "unknown" | "authenticated" | "anonymous" | "unavailable";
   accessToken: string | null;
   user: User | null;
 }
@@ -19,6 +21,10 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
       state.user = action.payload.user;
     },
+    sessionUnavailable(state) {
+      state.status = "unavailable";
+      state.accessToken = null;
+    },
     signedOut(state) {
       state.status = "anonymous";
       state.accessToken = null;
@@ -27,7 +33,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { credentialsReceived, signedOut } = authSlice.actions;
+export const { credentialsReceived, sessionUnavailable, signedOut } = authSlice.actions;
 export const authReducer = authSlice.reducer;
 
 // Non-sensitive preferences. This is the only slice that is persisted.

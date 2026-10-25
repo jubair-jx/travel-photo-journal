@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
+import { PhotoImage } from "@/components/ui/PhotoImage";
 import type { Photo } from "@/lib/types";
 
 interface PhotoCardProps {
@@ -29,12 +30,10 @@ export function PhotoCard({ photo, onOpen, onEdit, onDelete, onImageError }: Pho
         aria-label={`View ${photo.name}`}
         className="relative block aspect-4/3 w-full cursor-pointer overflow-hidden bg-slate-800 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-orange-400"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URLs from a configurable host, so next/image's host allow-list does not fit */}
-        <img
+        <PhotoImage
           src={photo.imageUrl}
           alt={`${photo.name}, ${photo.location}`}
-          loading="lazy"
-          onError={onImageError}
+          onFailure={onImageError}
           className="size-full object-cover transition duration-500 group-hover:scale-105"
         />
         <span className="absolute inset-x-0 bottom-0 block bg-linear-to-t from-black/80 via-black/30 to-transparent p-4 pt-12">

@@ -1,7 +1,8 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
 import type { Logger } from "pino";
 import { ZodError } from "zod";
-import { AppError, notFound, validationError } from "../lib/errors.js";
+import { AppError, databaseUnavailable, notFound, validationError } from "../lib/errors.js";
+import { isDatabaseUnavailable } from "../lib/prisma.js";
 
 export interface ErrorBody {
   success: false;
@@ -30,6 +31,18 @@ function parserErrorType(err: unknown): string | undefined {
   return undefined;
 }
 
+// Errors raised by the HTTP stack itself (an unsupported charset, an aborted upload, a bad
+// Content-Encoding) carry a 4xx status and are safe to show; without this they would become 500s.
+function clientFault(err: unknown): AppError | undefined {
+  if (typeof err !== "object" || err === null) return undefined;
+  const status = "status" in err ? err.status : undefined;
+  const exposed = "expose" in err && err.expose === true;
+  if (exposed && typeof status === "number" && status >= 400 && status < 500) {
+    return new AppError(status, "BAD_REQUEST", "The request could not be processed");
+  }
+  return undefined;
+}
+
 function normalize(err: unknown): unknown {
   if (err instanceof ZodError) return fromZod(err);
   if (parserErrorType(err) === "entity.parse.failed") {
@@ -38,7 +51,8 @@ function normalize(err: unknown): unknown {
   if (parserErrorType(err) === "entity.too.large") {
     return new AppError(413, "PAYLOAD_TOO_LARGE", "Request body is too large");
   }
-  return err;
+  if (isDatabaseUnavailable(err)) return databaseUnavailable();
+  return clientFault(err) ?? err;
 }
 
 function fromZod(err: ZodError): AppError {

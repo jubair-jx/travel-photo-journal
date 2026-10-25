@@ -21,6 +21,9 @@ export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const MAX_USER_AGENT_LENGTH = 300;
 
+// How long a spent refresh token may be retried after its rotation (see recoverLostRotation).
+export const ROTATION_GRACE_MS = 10_000;
+
 export interface SessionInfo {
   id: string;
   userAgent: string | null;
@@ -118,6 +121,80 @@ export function createSessionService({
     }
   }
 
+  type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+  interface SpentToken {
+    id: string;
+    userAgent: string | null;
+    sessionId: string;
+    sessionStartedAt: Date;
+    user: { id: string; email: string };
+  }
+
+  // Issues the next token of a session and links the one it replaces to it.
+  async function issueSuccessor(
+    tx: Tx,
+    old: SpentToken,
+    now: Date,
+  ): Promise<{ user: SpentToken["user"]; refreshToken: string }> {
+    const refreshToken = generateToken();
+    const successor = await tx.refreshToken.create({
+      data: {
+        userId: old.user.id,
+        tokenHash: hashToken(refreshToken),
+        expiresAt: new Date(now.getTime() + REFRESH_TOKEN_TTL_MS),
+        userAgent: old.userAgent,
+        sessionId: old.sessionId,
+        sessionStartedAt: old.sessionStartedAt,
+      },
+      select: { id: true },
+    });
+    await tx.refreshToken.update({ where: { id: old.id }, data: { replacedById: successor.id } });
+    return { user: old.user, refreshToken };
+  }
+
+  const SPENT_SELECT = {
+    id: true,
+    userAgent: true,
+    sessionId: true,
+    sessionStartedAt: true,
+    user: { select: { id: true, email: true } },
+  } as const;
+
+  // The response carrying a new refresh cookie can be lost (the tab was reloaded or closed, the
+  // network dropped) after the server has already rotated. The client then presents the old token
+  // again. Within a few seconds, and only while the token it was swapped for has never been used,
+  // that is treated as a retry: the unused successor is retired and a fresh token is issued. Past
+  // the window, or once the successor has been used, a replay is theft (see revokeDescendants).
+  async function recoverLostRotation(
+    tx: Tx,
+    tokenHash: string,
+    now: Date,
+  ): Promise<{ user: SpentToken["user"]; refreshToken: string } | null> {
+    const spent = await tx.refreshToken.findUnique({
+      where: { tokenHash },
+      select: { revokedAt: true, replacedById: true },
+    });
+    if (!spent?.revokedAt || !spent.replacedById) return null;
+    if (now.getTime() - spent.revokedAt.getTime() > ROTATION_GRACE_MS) return null;
+
+    const claimed = await tx.refreshToken.updateMany({
+      where: {
+        id: spent.replacedById,
+        revokedAt: null,
+        replacedById: null,
+        expiresAt: { gt: now },
+      },
+      data: { revokedAt: now },
+    });
+    if (claimed.count === 0) return null;
+
+    const unused = await tx.refreshToken.findUniqueOrThrow({
+      where: { id: spent.replacedById },
+      select: SPENT_SELECT,
+    });
+    return issueSuccessor(tx, unused, now);
+  }
+
   async function refresh(presented: string | undefined): Promise<SessionTokens> {
     if (!presented) throw invalidRefreshToken();
     const tokenHash = hashToken(presented);
@@ -129,32 +206,13 @@ export function createSessionService({
         where: { tokenHash, revokedAt: null, expiresAt: { gt: now } },
         data: { revokedAt: now },
       });
-      if (claimed.count === 0) return null;
+      if (claimed.count === 0) return recoverLostRotation(tx, tokenHash, now);
 
       const old = await tx.refreshToken.findUniqueOrThrow({
         where: { tokenHash },
-        select: {
-          id: true,
-          userAgent: true,
-          sessionId: true,
-          sessionStartedAt: true,
-          user: { select: { id: true, email: true } },
-        },
+        select: SPENT_SELECT,
       });
-      const refreshToken = generateToken();
-      const successor = await tx.refreshToken.create({
-        data: {
-          userId: old.user.id,
-          tokenHash: hashToken(refreshToken),
-          expiresAt: new Date(now.getTime() + REFRESH_TOKEN_TTL_MS),
-          userAgent: old.userAgent,
-          sessionId: old.sessionId,
-          sessionStartedAt: old.sessionStartedAt,
-        },
-        select: { id: true },
-      });
-      await tx.refreshToken.update({ where: { id: old.id }, data: { replacedById: successor.id } });
-      return { user: old.user, refreshToken };
+      return issueSuccessor(tx, old, now);
     });
 
     if (!rotated) {

@@ -29,17 +29,34 @@ function main(): void {
     logger.info({ port: config.port, env: config.nodeEnv }, "api listening");
   });
 
-  const shutdown = (signal: string): void => {
+  const shutdown = (signal: string, exitCode = 0): void => {
     logger.info({ signal }, "shutting down");
+    // Keep-alive connections would otherwise hold close() open indefinitely.
+    const forced = setTimeout(() => {
+      logger.error("shutdown timed out, exiting");
+      process.exit(1);
+    }, 10_000);
+    forced.unref();
     server.close(() => {
-      void prisma.$disconnect().finally(() => process.exit(0));
+      void prisma.$disconnect().finally(() => process.exit(exitCode));
     });
+    server.closeIdleConnections();
   };
   process.on("SIGTERM", () => {
     shutdown("SIGTERM");
   });
   process.on("SIGINT", () => {
     shutdown("SIGINT");
+  });
+  // Express reports handler errors itself. Anything arriving here escaped it, so the process state
+  // is unknown: log it and restart cleanly rather than limp on.
+  process.on("unhandledRejection", (reason) => {
+    logger.fatal({ err: reason }, "unhandled rejection");
+    shutdown("unhandledRejection", 1);
+  });
+  process.on("uncaughtException", (error) => {
+    logger.fatal({ err: error }, "uncaught exception");
+    shutdown("uncaughtException", 1);
   });
 }
 
