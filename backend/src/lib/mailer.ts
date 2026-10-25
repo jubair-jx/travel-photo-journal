@@ -29,6 +29,10 @@ export function createSmtpMailer({ from, smtp }: Config["mail"]): Mailer {
     port: smtp.port,
     // Port 465 is implicit TLS; other ports (587, Mailpit's 1025) upgrade via STARTTLS when offered.
     secure: smtp.port === 465,
+    // The defaults wait up to two minutes for a server that never answers.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
     ...(smtp.user !== undefined &&
       smtp.pass !== undefined && { auth: { user: smtp.user, pass: smtp.pass } }),
   });

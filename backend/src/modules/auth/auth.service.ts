@@ -55,7 +55,9 @@ export function createAuthService({ prisma, mailer, config, logger }: AuthServic
         data: { email, passwordHash, emailVerificationTokens: { create: stored } },
         select: { id: true },
       });
-      await sendVerificationEmail(user.id, email, token);
+      // Not awaited, like resend: an unreachable mail server must not hold the sign-up (or make a
+      // new address answer more slowly than a taken one).
+      void sendVerificationEmail(user.id, email, token);
     } catch (err) {
       // The unique index is the authority on duplicates; a pre-check would race.
       if (isUniqueViolation(err)) throw emailTaken();

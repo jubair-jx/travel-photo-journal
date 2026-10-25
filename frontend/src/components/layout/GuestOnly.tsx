@@ -14,6 +14,7 @@ export function GuestOnly({ children }: { children: ReactNode }) {
     if (status === "authenticated") router.replace("/photos");
   }, [status, router]);
 
-  if (status !== "anonymous") return <FullPageSpinner />;
+  // "unavailable" still shows the form: signing in is how they will find out if it is back.
+  if (status !== "anonymous" && status !== "unavailable") return <FullPageSpinner />;
   return children;
 }

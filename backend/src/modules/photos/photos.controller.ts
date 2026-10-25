@@ -8,6 +8,7 @@ import {
   type DescribeFields,
   type ListQuery,
   type PhotoFields,
+  type PhotoUpdate,
 } from "./photos.schema.js";
 import type { PhotoService } from "./photos.service.js";
 
@@ -36,11 +37,16 @@ export function createPhotoController(service: PhotoService) {
     sendSuccess(res, await service.get(authenticatedUserId(req), photoIdOf(req)));
   };
 
-  const update: RequestHandler<ParamsDictionary, unknown, PhotoFields> = async (req, res) => {
-    sendSuccess(
-      res,
-      await service.update(authenticatedUserId(req), photoIdOf(req), req.body, req.image),
-    );
+  const update: RequestHandler<ParamsDictionary, unknown, PhotoUpdate> = async (req, res) => {
+    // The id comes first: a photo that cannot exist is "not found", whatever else is wrong.
+    const id = photoIdOf(req);
+    // Any subset of the fields is fine, but an edit that changes nothing is a mistake worth saying so.
+    if (Object.keys(req.body).length === 0 && !req.image) {
+      throw validationError([
+        { path: "", message: "Send at least one field or a new image to change" },
+      ]);
+    }
+    sendSuccess(res, await service.update(authenticatedUserId(req), id, req.body, req.image));
   };
 
   const remove: RequestHandler = async (req, res) => {

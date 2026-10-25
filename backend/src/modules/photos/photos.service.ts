@@ -6,7 +6,7 @@ import { isRecordNotFound, type Photo, type PrismaClient } from "../../lib/prism
 import type { StorageService } from "../../lib/storage.js";
 import { SummaryError, type Summarizer } from "../../lib/summarizer.js";
 import type { UploadedImage } from "../../middleware/upload.js";
-import type { ListQuery, PhotoFields } from "./photos.schema.js";
+import type { ListQuery, PhotoFields, PhotoUpdate } from "./photos.schema.js";
 
 export interface PhotoServiceDeps {
   prisma: PrismaClient;
@@ -134,7 +134,7 @@ export function createPhotoService({
   async function update(
     userId: string,
     id: string,
-    fields: PhotoFields,
+    fields: PhotoUpdate,
     image: UploadedImage | undefined,
   ): Promise<PhotoView> {
     // Checked before anything is uploaded or summarized: a caller who does not own the photo
@@ -146,7 +146,7 @@ export function createPhotoService({
     // A summary describing text that no longer exists would be wrong, so it is only reused when
     // the description is untouched; otherwise it is regenerated, or cleared if that fails.
     const summaryPromise =
-      fields.description === existing.description
+      fields.description === undefined || fields.description === existing.description
         ? Promise.resolve(existing.summary)
         : summarize(fields.description);
 

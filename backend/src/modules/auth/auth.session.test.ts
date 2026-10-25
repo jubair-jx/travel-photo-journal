@@ -37,6 +37,13 @@ const logout = (cookie?: string) => {
   return cookie === undefined ? req : req.set("Cookie", cookieHeader(cookie));
 };
 
+// Pretends the rotations happened a minute ago, i.e. outside the retry window for a lost response.
+const ageRotations = () =>
+  ctx.prisma.refreshToken.updateMany({
+    where: { revokedAt: { not: null } },
+    data: { revokedAt: new Date(Date.now() - 60_000) },
+  });
+
 const login = (body: object = defaultUser) => request(ctx.app).post("/auth/login").send(body);
 
 describe("POST /auth/login", () => {
@@ -358,6 +365,7 @@ describe("POST /auth/refresh", () => {
     await createUser(ctx.prisma);
     const stolen = await signIn();
     const legitimate = refreshCookieFrom(await refresh(stolen))?.value ?? "";
+    await ageRotations();
 
     const replay = await refresh(stolen);
     const afterwards = await refresh(legitimate);
@@ -375,6 +383,7 @@ describe("POST /auth/refresh", () => {
     for (let i = 0; i < 3; i += 1) {
       current = refreshCookieFrom(await refresh(current))?.value ?? "";
     }
+    await ageRotations();
 
     await refresh(first);
 
@@ -390,19 +399,21 @@ describe("POST /auth/refresh", () => {
       refreshCookieFrom(await login({ email: "other@example.com", password: defaultUser.password }))
         ?.value ?? "";
     await refresh(mine);
+    await ageRotations();
 
     await refresh(mine);
 
     expect((await refresh(theirs)).status).toBe(200);
   });
 
-  it("lets exactly one of two simultaneous refreshes through", async () => {
+  it("lets two simultaneous refreshes both succeed, leaving exactly one live token", async () => {
     await createUser(ctx.prisma);
     const token = await signIn();
 
     const results = await Promise.all([refresh(token), refresh(token)]);
 
-    expect(results.map((r) => r.status).sort()).toEqual([200, 401]);
+    expect(results.map((r) => r.status)).toEqual([200, 200]);
+    expect(await ctx.prisma.refreshToken.count({ where: { revokedAt: null } })).toBe(1);
   });
 
   it.each([
@@ -425,6 +436,74 @@ describe("POST /auth/refresh", () => {
 
     expect(res.status).toBe(401);
     expect(res.body).toEqual(sessionExpired);
+  });
+});
+
+describe("retrying a refresh whose response was lost", () => {
+  const sessionExpired = {
+    success: false,
+    error: { code: "INVALID_REFRESH_TOKEN", message: "Session expired, sign in again" },
+  };
+
+  it("issues a fresh token when the old one is presented again right away", async () => {
+    await createUser(ctx.prisma);
+    const original = await signIn();
+    // The client never saw this response: the page was reloaded while it was in flight.
+    const lost = refreshCookieFrom(await refresh(original))?.value ?? "";
+
+    const retry = await refresh(original);
+
+    expect(retry.status).toBe(200);
+    const recovered = refreshCookieFrom(retry)?.value ?? "";
+    expect(recovered).not.toBe(lost);
+    expect(await ctx.prisma.refreshToken.count({ where: { revokedAt: null } })).toBe(1);
+    expect((await refresh(recovered)).status).toBe(200);
+  });
+
+  it("does not forgive a replay once the newer token has been used", async () => {
+    await createUser(ctx.prisma);
+    const original = await signIn();
+    const second = refreshCookieFrom(await refresh(original))?.value ?? "";
+    await refresh(second);
+
+    const replay = await refresh(original);
+
+    expect(replay.status).toBe(401);
+    expect(replay.body).toEqual(sessionExpired);
+    expect(await ctx.prisma.refreshToken.count({ where: { revokedAt: null } })).toBe(0);
+  });
+
+  it("does not forgive a replay after the window has passed", async () => {
+    await createUser(ctx.prisma);
+    const original = await signIn();
+    await refresh(original);
+    await ageRotations();
+
+    const replay = await refresh(original);
+
+    expect(replay.status).toBe(401);
+    expect(await ctx.prisma.refreshToken.count({ where: { revokedAt: null } })).toBe(0);
+  });
+
+  it("does not bring a signed-out session back", async () => {
+    await createUser(ctx.prisma);
+    const original = await signIn();
+    const current = refreshCookieFrom(await refresh(original))?.value ?? "";
+    await logout(current);
+
+    const replay = await refresh(original);
+
+    expect(replay.status).toBe(401);
+  });
+
+  it("keeps the session's identity (id, device) across a recovery", async () => {
+    await createUser(ctx.prisma);
+    const original = await signIn();
+    await refresh(original);
+    await refresh(original);
+
+    const rows = await ctx.prisma.refreshToken.findMany();
+    expect(new Set(rows.map((row) => row.sessionId)).size).toBe(1);
   });
 });
 

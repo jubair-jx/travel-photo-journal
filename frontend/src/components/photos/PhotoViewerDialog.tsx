@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { PhotoImage } from "@/components/ui/PhotoImage";
 import type { Photo } from "@/lib/types";
 
 interface PhotoViewerDialogProps {
@@ -25,12 +26,11 @@ export function PhotoViewerDialog({
       {photo && (
         <div className="space-y-5">
           <div className="overflow-hidden rounded-2xl bg-black/40 ring-1 ring-white/10">
-            {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URLs from a configurable host, so next/image's host allow-list does not fit */}
-            <img
+            <PhotoImage
               src={photo.imageUrl}
               alt={`${photo.name}, ${photo.location}`}
-              onError={onImageError}
-              className="mx-auto max-h-[60vh] w-full object-contain"
+              onFailure={onImageError}
+              className="mx-auto max-h-[60vh] min-h-40 w-full object-contain"
             />
           </div>
 

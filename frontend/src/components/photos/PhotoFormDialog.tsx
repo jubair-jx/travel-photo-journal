@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { TextAreaField, TextField } from "@/components/ui/Field";
 import { LocationField } from "@/components/ui/LocationField";
+import { PhotoImage } from "@/components/ui/PhotoImage";
 import { applyFieldIssues, isApiError } from "@/lib/errors";
 import { photoFieldsSchema, validateImage, type PhotoFieldValues } from "@/lib/schemas";
 import type { Photo } from "@/lib/types";
@@ -172,11 +173,10 @@ function PhotoForm({ photo, onClose }: Omit<PhotoFormDialogProps, "open">) {
           Image
         </label>
         {shownImage && (
-          // eslint-disable-next-line @next/next/no-img-element -- local preview or signed URL
-          <img
+          <PhotoImage
             src={shownImage}
             alt="Selected photo preview"
-            className="mb-2 max-h-48 rounded-lg object-cover"
+            className="mb-2 min-h-16 max-h-48 rounded-lg object-cover"
           />
         )}
         <input

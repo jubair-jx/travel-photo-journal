@@ -500,7 +500,7 @@ describe("PUT /photos/:id", () => {
     expect(ctx.storage.objects.size).toBe(1);
   });
 
-  it("requires all three text fields", async () => {
+  it("accepts just one field, leaving the others as they were", async () => {
     const { user, auth } = await signedInUser();
     const photo = await seedPhoto(user.id);
 
@@ -509,11 +509,10 @@ describe("PUT /photos/:id", () => {
       .set("Authorization", auth)
       .field("name", "Only a name");
 
-    expect(res.status).toBe(400);
-    expect((res.body as ErrorBody).error.details).toMatchObject([
-      { path: "location" },
-      { path: "description" },
-    ]);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      data: { name: "Only a name", location: photo.location, description: photo.description },
+    });
   });
 
   it("cannot edit someone else's photo: 404, nothing written, nothing uploaded", async () => {

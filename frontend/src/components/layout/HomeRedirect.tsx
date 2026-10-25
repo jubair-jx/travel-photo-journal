@@ -11,7 +11,7 @@ export function HomeRedirect() {
 
   useEffect(() => {
     if (status === "authenticated") router.replace("/photos");
-    if (status === "anonymous") router.replace("/login");
+    if (status === "anonymous" || status === "unavailable") router.replace("/login");
   }, [status, router]);
 
   return <FullPageSpinner />;
