@@ -1,60 +1,84 @@
 # Deployment
 
-## Topology
+The live app runs on free tiers:
 
-| Part     | Where                         | Notes                                                                                                                                                                                                                    |
-| -------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Web      | Vercel                        | `/api/*` is rewritten to the API, so the browser only talks to the web origin and the refresh cookie is same-origin.                                                                                                     |
-| API      | Railway (Docker)              | Built from `backend/Dockerfile` with `backend/` as the context. Services do not sleep by default; verify Railway's current trial and plan terms, since a paid plan may be needed if the review falls after a trial ends. |
-| Database | Neon Postgres                 | Pooled `DATABASE_URL` for the app, direct `DIRECT_URL` for migrations.                                                                                                                                                   |
-| Images   | Neon Object Storage (private) | Accessed through the storage interface; signed URLs only.                                                                                                                                                                |
-| Email    | Resend HTTPS API              | Mailpit (SMTP) locally. Production uses the API because free hosts block SMTP ports.                                                                                                                                     |
+| Part                       | Where                         | Notes                                                                                                                |
+| -------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Web                        | Vercel                        | `/api/*` is rewritten to the API, so the browser only talks to the web origin and the refresh cookie is same-origin. |
+| API                        | Render (Docker, free plan)    | Built from `backend/Dockerfile`. Sleeps when idle, see [Free-plan behaviour](#free-plan-behaviour).                  |
+| Database                   | Neon Postgres                 | Pooled `DATABASE_URL` for the app, direct `DIRECT_URL` for migrations.                                               |
+| Images                     | Neon Object Storage (private) | Accessed through the storage interface; signed URLs only.                                                            |
+| Email                      | Resend HTTPS API              | Mailpit (SMTP) locally. Production uses the API because free hosts block the SMTP ports (25, 465, 587).              |
+| Summaries and descriptions | Anthropic API                 | The cheapest model; roughly $0.0002 per photo with both features.                                                    |
 
 Tests run against Postgres in compose and in CI; Neon is not used for tests.
 
 ## Container images
 
-- **API** (`backend/Dockerfile`): multi-stage (compile, production dependencies, runtime). Runs as the non-root `node` user with a `/health` healthcheck, fails fast with a readable message if configuration is invalid, and contains the Prisma CLI, schema and migrations because releases run `prisma migrate deploy` from the same image. The size (roughly 700 MB) is dominated by Prisma's migration tooling; a separate migrate image would shrink the runtime image if that ever matters.
-- **Web** (`frontend/Dockerfile`): Next.js standalone output, non-root. `API_INTERNAL_URL` is a build argument because Next resolves rewrites at build time.
+- **API** (`backend/Dockerfile`): multi-stage (compile, production dependencies, runtime). Runs as the non-root `node` user with a `/health` healthcheck, fails fast with a readable message if configuration is invalid, and contains the Prisma CLI, schema and migrations so `prisma migrate deploy` can run from the same image.
+- **Web** (`frontend/Dockerfile`): Next.js standalone output, non-root. `API_INTERNAL_URL` is a build argument because Next resolves rewrites at build time. On Vercel the platform builds the app itself and the Dockerfile is not used.
 - Both build in CI on every change.
 
 ## Releasing
 
-1. Build and push the images (or let the platform build from the Dockerfile).
-2. Run the migrations **before** the new API version takes traffic: `npx prisma migrate deploy` from the image's working directory (`/app`), with `DIRECT_URL` set. On Railway this is the pre-deploy command; in compose it is the `migrate` service.
-3. Start the API, then check `GET /health`.
+1. **Apply database migrations first**, from a machine with the direct connection string (Render's free plan has no pre-deploy command):
+   ```bash
+   cd backend
+   DIRECT_URL=<direct neon url> npx prisma migrate deploy
+   ```
+   Migrations are forward-only and applied in order; `migrate deploy` never creates or resets a database.
+2. Merge to `main`. Render and Vercel both deploy from `main` automatically.
+3. Check `GET /health` on the API, then sign in on the web app.
 
-Migrations are forward-only and applied in order; `migrate deploy` never creates or resets a database.
+## Setting up the API on Render
 
-## Deploying the API on Railway
+1. **New → Web Service**, connect the GitHub repository (it can be private).
+2. Settings:
+   - **Language:** Docker (it cannot be changed after creation)
+   - **Region:** Ohio, the same region as the Neon database
+   - **Root Directory:** empty
+   - **Dockerfile Path:** `backend/Dockerfile`
+   - **Docker Build Context Directory:** `backend`
+   - **Instance type:** Free
+   - **Health Check Path:** `/health`
+3. **Environment:** add the variables below, then deploy.
 
-The production image was checked locally the way Railway runs it: `prisma migrate deploy` as the pre-deploy command, then the server started with `PORT` injected, `NODE_ENV=production` and no `.env` file. `/health` answered 200, the process ran as a non-root user, and registration worked even with an unreachable mail server.
+### API environment variables
 
-1. **New project, Deploy from GitHub repo.** Give Railway access to the repository (it can be private).
-2. **Service settings:** Root Directory `backend`; the builder is the Dockerfile in it. `backend/railway.json` already sets the pre-deploy command (`npx prisma migrate deploy`), the health check (`/health`) and the restart policy. If Railway does not pick the file up from a root directory, enter the same three values in the service's Deploy settings.
-3. **Variables** (service Variables tab), as listed under Production configuration. `DIRECT_URL` must be the Neon **direct** string (no `-pooler`), because the pre-deploy migration uses it; `DATABASE_URL` is the pooled one.
-4. **Networking:** generate a public domain. That URL, `https://<name>.up.railway.app`, is what Vercel gets as `API_INTERNAL_URL`.
-5. **Order:** deploy the API first, then set `API_INTERNAL_URL` on Vercel and deploy the web app, then set `APP_URL` on Railway to the Vercel URL and redeploy the API.
-6. **Check:** open `<railway-url>/health`, then register, verify the email, sign in, reload the page (you must stay signed in), upload a photo.
+Never commit these. Set them in the Render dashboard. The names and meanings are also listed in [development.md](development.md) and in `backend/.env.example`.
 
-**Cost:** a new Railway account gets a one-time $5 trial credit that expires after 30 days; after that the Hobby plan is $5 a month including $5 of usage, enough for this small API. The service does not sleep. The review needs the link up until the reviewers reply, so plan for the paid plan.
+| Variable                                                                                                   | Value in production                                                                                         |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                                                                                 | `production` (makes the refresh cookie `Secure`)                                                            |
+| `APP_URL`                                                                                                  | The Vercel URL, no trailing slash; used for CORS and the links in emails                                    |
+| `TRUST_PROXY`                                                                                              | `2` (Vercel, then Render); client IPs drive rate limiting                                                   |
+| `REFRESH_COOKIE_PATH`                                                                                      | `/api/auth` (the path the browser sees behind the proxy)                                                    |
+| `DATABASE_URL`                                                                                             | Neon **pooled** connection string                                                                           |
+| `JWT_SECRET`, `TOTP_ENC_KEY`                                                                               | 32+ characters; 32 random bytes in base64. Losing `TOTP_ENC_KEY` makes stored two-factor secrets unreadable |
+| `RESEND_API_KEY`, `MAIL_FROM`                                                                              | Resend key; sender on a domain verified in Resend, e.g. `Travel Journal <noreply@your-domain>`              |
+| `STORAGE_DRIVER`                                                                                           | `s3`                                                                                                        |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | Neon Object Storage credentials (`S3_FORCE_PATH_STYLE=true`)                                                |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                     | Optional; enables summaries and "Write with AI". Model defaults to `claude-haiku-5-5`                       |
 
-## Production configuration
+`DIRECT_URL` is only needed where migrations run, not on the API service.
 
-Never commit any of these. Set them in the platform dashboards.
+## Setting up the web app on Vercel
 
-**API (Railway):** `NODE_ENV=production`, `PORT` (Railway sets it), `APP_URL` (the Vercel URL), `TRUST_PROXY=2` (Vercel, then Railway's edge; check that logged client IPs look right), `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `TOTP_ENC_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `STORAGE_DRIVER=s3`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `ANTHROPIC_API_KEY` (or `OPENROUTER_API_KEY`), `OPENROUTER_MODEL`, `OPENROUTER_FALLBACK_MODELS`. Optionally `REFRESH_COOKIE_PATH=/api/auth`.
+1. **Add New → Project**, import the repository, and choose the `frontend` project (Root Directory `frontend`).
+2. Add `API_INTERNAL_URL` with the API's public URL (no trailing slash) **before the first build**. Changing it later needs a redeploy.
+3. Deploy, then put the resulting URL into `APP_URL` on Render.
 
-**Web (Vercel):** `API_INTERNAL_URL` set to the API's public URL, and set **before the build**, since rewrites are resolved then. Project root directory `frontend`.
+## Free-plan behaviour
 
-Secret handling: `JWT_SECRET` must be 32 or more characters, `TOTP_ENC_KEY` exactly 32 random bytes in base64. Losing `TOTP_ENC_KEY` makes stored 2FA secrets unreadable, so treat it like a database credential.
+- **The API sleeps** after 15 minutes without traffic and takes up to about a minute to wake. The web app shows a short "Waking up the server" note while it waits. To keep the API awake, point a free uptime monitor (for example UptimeRobot) at `GET /health` every 5 minutes.
+- **The Neon database** suspends its compute when idle on the free plan; the first query afterwards can take a few seconds. The web app tolerates this (the session refresh waits up to 20 seconds, and a "Try again" panel appears instead of signing the user out).
+- **Render's filesystem is not persistent**, which is fine: images live in object storage and nothing else is written to disk.
 
-## Cold starts and the live link
+## Checks on the live site
 
-The Railway service stays running, so the API itself has no cold start. The Neon database does: on the free plan its compute suspends after a few minutes idle, and the first query after that can take a few seconds. The web app tolerates this (the refresh waits up to 20 seconds and retries are offered), but warm up the live site before sharing the link.
+Register with a real address, open the verification email, sign in, reload the page (you must stay signed in), add a photo with a description of at least 80 characters (an AI summary should appear), edit it, delete it.
 
-## Things to confirm on the live site
+Two things worth confirming after any change to hosting:
 
 - **Upload size through Vercel's rewrite.** Vercel documents a 4.5 MB request body limit for its serverless functions. Rewrites to an external origin are normally proxied without that limit, but if a 10 MB upload fails with a 413 from Vercel (not from the API), lower the client-side image limit to 4 MB (and the API limit with it), or send uploads straight to the API with CORS enabled.
-- **Cookies.** The refresh cookie must be set on the Vercel domain, Secure, httpOnly, `SameSite=Lax`.
-- **Email.** Set `RESEND_API_KEY` and `MAIL_FROM`; the sender address must be on a domain verified in Resend (Domains). Free web hosts (Render's included) block outbound SMTP on ports 25, 465 and 587, which is why production mail goes over the HTTPS API; `SMTP_*` is only needed when `RESEND_API_KEY` is not set.
+- **Cookies.** The refresh cookie must be set on the Vercel domain, `Secure`, `httpOnly`, `SameSite=Lax`.

@@ -156,11 +156,10 @@ A web application and REST API where a person registers, verifies their email, s
 ## Out of Scope
 
 - Password reset and email change
-- Disabling 2FA and recovery codes
+- 2FA recovery codes
 - Sharing **Photos** with other people or public galleries
 - Albums, tags, search, maps
 - Image resizing, thumbnails, malware scanning
-- Device list and per-device sign-out
 - Background job queue for summaries
 - Social sign-in
 - Admin tools and moderation
@@ -168,4 +167,15 @@ A web application and REST API where a person registers, verifies their email, s
 ## Further Notes
 
 - Free-tier hosting can add start-up delay; the deployment plan addresses it explicitly (see deployment doc).
-- Future improvements are collected in the README: device list, scanning, asynchronous summaries, image processing, observability and end-to-end tests.
+- Future improvements are collected in the README: an absolute session lifetime, 2FA recovery codes, scanning, asynchronous summaries, image processing, observability and end-to-end tests.
+
+## Added after the first release
+
+These were not in the original scope and were added on top of it:
+
+- **Signed-in devices:** list them, sign out one or all (`/auth/sessions`).
+- **Two-factor status and turn-off:** the security page shows whether it is on; switching it off needs the password and a current code.
+- **AI description from the image:** the add-photo form can draft the description from the chosen picture (`POST /photos/describe`); nothing is stored until the user saves.
+- **Location suggestions:** place suggestions while typing, with free text always accepted.
+- **Photo viewer:** clicking a card opens it full size with the summary and description.
+- **Partial edits:** `PUT /photos/:id` accepts any subset of the fields.

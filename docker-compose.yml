@@ -6,7 +6,7 @@
 #   web       http://localhost:3000 (proxies /api/* to the API)
 #
 # For tests only, `docker compose up -d postgres` is enough.
-# Secrets (JWT_SECRET, TOTP_ENC_KEY, OPENROUTER_*) come from backend/.env (see backend/.env.example).
+# Secrets (JWT_SECRET, TOTP_ENC_KEY, ANTHROPIC_API_KEY, OPENROUTER_*) come from backend/.env (see backend/.env.example).
 # Settings below override that file so the stack always runs against the local containers.
 
 name: travel-photo-journal

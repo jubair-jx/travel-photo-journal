@@ -8,10 +8,22 @@ A private journal for travel photos. Register, verify your email, sign in (optio
 | API  | https://travel-photo-journal-api.onrender.com (`GET /health`) |
 | Docs | [`docs/`](docs/README.md)                                     |
 
+The API runs on a free hosting plan that sleeps when idle, so the first request after a quiet period can take up to a minute. The web app says so while it waits.
+
+## Try it
+
+1. Open the web app and **register** with a real email address. A verification email arrives within seconds (check spam).
+2. Click the link in the email, then **sign in**.
+3. **Add a photo**: pick an image, and use **Write with AI** to draft the description, or type your own. Descriptions of 80 characters or more get an **AI summary** when saved.
+4. Click a card to open it, **edit** or **delete** it.
+5. Under **Security**, turn on **two-factor authentication** with an authenticator app, and see or sign out your signed-in devices.
+
 ## Features
 
-- **Accounts:** registration with email verification (single-use, 24-hour links), sign-in with a short-lived access token and a rotating refresh token, optional TOTP two-factor authentication with a QR code.
+- **Accounts:** registration with email verification (single-use, 24-hour links; the account stays inactive until verified), sign-in with a short-lived access token and a rotating refresh token, and optional TOTP two-factor authentication with a QR code, which can be switched off again with the password and a current code.
+- **Sessions:** a list of signed-in devices, sign out of one or all of them.
 - **Photos:** create, list (paginated, newest first), view, edit (optionally replacing the image) and delete. Images are validated by their actual content, stored privately and shown through short-lived signed links.
+- **Location suggestions:** the location field suggests places as you type (OpenStreetMap data) and always accepts text typed by hand.
 - **AI description:** in the add-photo form, "Write with AI" looks at the chosen picture and drafts the description, which you can edit before saving.
 - **Summaries:** a short summary of each description is generated on save with the cheapest Claude model (Haiku, a fraction of a cent per photo), or via OpenRouter with model fallback; if it is unavailable, the photo still saves.
 - **Privacy by construction:** every photo query is scoped to its owner, and another user's photo behaves exactly like one that does not exist.
@@ -25,7 +37,7 @@ A private journal for travel photos. Register, verify your email, sign in (optio
 | Validation | Zod on every input                                                        | One definition of what each endpoint accepts; unknown fields are dropped (which is also how a client-supplied summary is ignored).                                                                                 |
 | Passwords  | argon2id                                                                  | Memory-hard, recommended by OWASP ([ADR-0003](docs/adr/0003-argon2id-for-password-hashing.md)).                                                                                                                    |
 | Sessions   | 15-minute JWT (HS256) plus a rotating refresh token in an httpOnly cookie | Limits what a stolen access token is worth while keeping long sessions revocable ([ADR-0004](docs/adr/0004-refresh-token-rotation-in-httponly-cookie.md), [ADR-0009](docs/adr/0009-refresh-session-mechanics.md)). |
-| Images     | Neon Object Storage (private, S3-compatible) behind a storage interface   | No public URLs, cheap egress, and a local-disk driver for development and tests ([ADR-0005](docs/adr/0005-r2-behind-a-storage-interface.md)).                                                                      |
+| Images     | Neon Object Storage (private, S3-compatible) behind a storage interface   | No public URLs, cheap egress, and a local-disk driver for development and tests ([ADR-0005](docs/adr/0005-s3-compatible-storage-behind-an-interface.md)).                                                          |
 | Email      | Resend HTTPS API in production, SMTP (Mailpit) locally                    | A real relay with a free tier, and a mail catcher so nothing external is needed in development.                                                                                                                    |
 | Web        | Next.js (App Router), Tailwind CSS, Framer Motion                         | Simple pages, utility-class styling, light motion that respects reduced-motion settings.                                                                                                                           |
 | Web data   | Redux Toolkit with RTK Query; react-hook-form and zod                     | Caching and one place for auth, errors and silent refresh ([ADR-0011](docs/adr/0011-web-client-state-and-session.md)).                                                                                             |
@@ -43,7 +55,7 @@ Two connection strings are used: `DATABASE_URL` is the **pooled** endpoint for t
 ```mermaid
 flowchart LR
   Browser["Browser"] -->|"HTTPS"| Web["Next.js web app<br/>(Vercel)"]
-  Web -->|"/api/* rewrite"| API["Express API<br/>(Railway, Docker)"]
+  Web -->|"/api/* rewrite"| API["Express API<br/>(Render, Docker)"]
   API -->|"Prisma, pooled"| DB[("Neon Postgres")]
   API -->|"S3 API, signed URLs"| R2[("Neon Object Storage<br/>private bucket")]
   API -->|"HTTPS"| Mail["Resend"]
@@ -60,7 +72,7 @@ flowchart LR
   Req["Request"] --> Log["request id + logging"] --> Sec["helmet, CORS"] --> Body["body limits"] --> Route["routes"]
   Route --> Lim["rate limit"] --> Val["validate (Zod)"] --> Auth["requireAuth"] --> Ctl["controller"] --> Svc["service"]
   Svc --> Prisma[("Prisma")]
-  Svc --> Ifaces["Mailer / StorageService / Summarizer<br/>(interfaces, injected)"]
+  Svc --> Ifaces["Mailer / StorageService / Summarizer / Describer<br/>(interfaces, injected)"]
   Svc -.->|"errors"| Err["error handler: one response shape"]
 ```
 
@@ -139,22 +151,28 @@ Backend and frontend are independent packages; run these inside `backend/` or `f
 
 Responses always use one of two shapes: `{ "success": true, "data": ... }` or `{ "success": false, "error": { "code", "message", "details?" } }`. The full reference, with request bodies, responses and every error code, is in [docs/backend/api.md](docs/backend/api.md).
 
-| Method and path                  | Purpose                                                     | Auth   |
-| -------------------------------- | ----------------------------------------------------------- | ------ |
-| `GET /health`                    | Liveness check                                              | none   |
-| `POST /auth/register`            | Create an account and email a verification link             | none   |
-| `POST /auth/verify-email`        | Confirm the emailed token (single use)                      | none   |
-| `POST /auth/resend-verification` | Send a fresh verification link                              | none   |
-| `POST /auth/login`               | Sign in; optional `totpCode`                                | none   |
-| `POST /auth/refresh`             | Rotate the refresh cookie, get a new access token           | cookie |
-| `POST /auth/logout`              | End the current session                                     | cookie |
-| `POST /auth/2fa/setup`           | Start two-factor setup: QR code and manual key              | bearer |
-| `POST /auth/2fa/verify`          | Confirm a code and switch two-factor on                     | bearer |
-| `GET /photos`                    | List my photos (`page`, `limit`)                            | bearer |
-| `POST /photos`                   | Add a photo (multipart: image, name, location, description) | bearer |
-| `GET /photos/:id`                | Read one of my photos                                       | bearer |
-| `PUT /photos/:id`                | Edit a photo, optionally replacing the image                | bearer |
-| `DELETE /photos/:id`             | Delete a photo and its stored file                          | bearer |
+| Method and path                  | Purpose                                                       | Auth   |
+| -------------------------------- | ------------------------------------------------------------- | ------ |
+| `GET /health`                    | Liveness check                                                | none   |
+| `POST /auth/register`            | Create an account and email a verification link               | none   |
+| `POST /auth/verify-email`        | Confirm the emailed token (single use)                        | none   |
+| `POST /auth/resend-verification` | Send a fresh verification link                                | none   |
+| `POST /auth/login`               | Sign in; optional `totpCode` when two-factor is on            | none   |
+| `POST /auth/refresh`             | Rotate the refresh cookie, get a new access token             | cookie |
+| `POST /auth/logout`              | End the current session                                       | cookie |
+| `POST /auth/2fa/setup`           | Start two-factor setup: QR code and manual key                | bearer |
+| `POST /auth/2fa/verify`          | Confirm a code and switch two-factor on                       | bearer |
+| `GET /auth/2fa`                  | Is two-factor on?                                             | bearer |
+| `POST /auth/2fa/disable`         | Switch two-factor off (password and current code)             | bearer |
+| `GET /auth/sessions`             | List signed-in devices                                        | bearer |
+| `DELETE /auth/sessions/:id`      | Sign out one device                                           | bearer |
+| `DELETE /auth/sessions`          | Sign out everywhere                                           | bearer |
+| `GET /photos`                    | List my photos (`page`, `limit`)                              | bearer |
+| `POST /photos`                   | Add a photo (multipart: image, name, location, description)   | bearer |
+| `POST /photos/describe`          | Draft a description from an image (nothing is stored)         | bearer |
+| `GET /photos/:id`                | Read one of my photos                                         | bearer |
+| `PUT /photos/:id`                | Edit any of name, location, description, or replace the image | bearer |
+| `DELETE /photos/:id`             | Delete a photo and its stored file                            | bearer |
 
 ## Security decisions
 
@@ -174,16 +192,35 @@ The complete list, with status, is in [docs/backend/security.md](docs/backend/se
 
 ```bash
 docker compose up -d postgres
-npm test
+(cd backend && npm test)
+(cd frontend && npm test)
 ```
 
-- **API:** integration tests drive the real routes with supertest against a real Postgres, covering the happy paths, validation, authentication, rate limits, the refresh-token theft response, upload validation and ownership on every photo route. The mailer, storage and summarizer are replaced through their interfaces, and the summarizer client is also tested against a local HTTP server that imitates OpenRouter. Security-critical behavior was mutation-checked by breaking it on purpose and confirming a test fails.
-- **Web:** unit tests for the data layer (single-flight silent refresh, error normalization, what is and is not persisted) and for the form schemas and error helpers.
+- **API:** about 280 tests. Integration tests drive the real routes with supertest against a real Postgres, covering happy paths, validation, authentication, rate limits, the refresh-token theft response and lost-response recovery, upload validation, error mapping, and ownership on every photo route. The mailer, storage, summarizer and describer are replaced through their interfaces, so tests need no external accounts.
+- **Web:** about 50 unit tests for the data layer (single-flight silent refresh, what happens when the server is unreachable, error normalization, what is and is not persisted), form schemas, error helpers, and the place-suggestion helper.
 - **CI** (`.github/workflows/ci.yml`): format, lint, typecheck, tests against a Postgres service, build, `npm audit`, and a build of both Docker images.
 
 ## Docker
 
 `docker compose up --build` runs Postgres, Mailpit, a one-shot migration service, the API and the web app, with health checks and start-up ordering. The images are multi-stage and run as a non-root user. See [docs/devops/development.md](docs/devops/development.md) and [docs/devops/deployment.md](docs/devops/deployment.md).
+
+## Requirements coverage
+
+| Requirement                                               | Where it is met                                                                                                |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Register and log in                                       | `POST /auth/register`, `POST /auth/login`; pages `/register`, `/login`                                         |
+| Email verification; account inactive until verified       | Single-use 24-hour link by email; login is refused until verified (`EMAIL_NOT_VERIFIED`); `/verify-email` page |
+| JWT session with an access token; refresh token as a plus | 15-minute access token, rotating refresh token in an httpOnly cookie with theft detection                      |
+| Passwords hashed, never stored or logged in plain text    | argon2id; password fields are redacted from logs                                                               |
+| Two-factor authentication with a QR code (recommended)    | `/auth/2fa/setup` and `/auth/2fa/verify`; login asks for a code when on; can be switched off                   |
+| Add, edit, view and delete my own photos                  | `/photos` routes and the photo list page with add, edit, view and delete                                       |
+| Photo, name, location, description                        | Multipart upload; the image is checked by its bytes (JPEG, PNG, WebP, up to 10 MB)                             |
+| Summary generated automatically on post and saved         | Generated from the description on save and stored in the database; the user never enters it                    |
+| Never read or change another user's photos                | Ownership is part of every query and answered with 404; tested on every photo route                            |
+| Photo storage                                             | Private S3-compatible bucket (Neon Object Storage), expiring signed links, file removed on delete              |
+| Consistent responses and proper status codes              | One success shape and one error shape; codes documented in [docs/backend/api.md](docs/backend/api.md)          |
+| Live link, Git history, README, list of improvements      | Links at the top; conventional commits; this file                                                              |
+| Bonus: 2FA, AI summarization, tests, Docker               | All four: see Features, Testing and Docker                                                                     |
 
 ## Design decisions
 
@@ -197,7 +234,7 @@ Each significant decision has a short record in [docs/adr/](docs/adr):
 6. [Summary generation with fallback, never blocking the save](docs/adr/0006-summary-generation-with-fallback.md)
 7. [Ownership enforced in the query, returning 404](docs/adr/0007-ownership-via-scoped-queries-returning-404.md)
 8. [Duplicate registration returns 409](docs/adr/0008-duplicate-registration-returns-409.md)
-9. [Refresh sessions: chain walk, sliding expiry, no grace window](docs/adr/0009-refresh-session-mechanics.md)
+9. [Refresh sessions: chain walk, sliding expiry, a short retry window](docs/adr/0009-refresh-session-mechanics.md)
 10. [TOTP secrets: AES-256-GCM bound to the user](docs/adr/0010-totp-secret-encryption.md)
 11. [Web client: RTK Query, single-flight silent refresh, persistence only for non-sensitive state](docs/adr/0011-web-client-state-and-session.md)
 
