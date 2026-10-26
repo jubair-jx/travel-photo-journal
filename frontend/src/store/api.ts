@@ -66,18 +66,63 @@ export function toApiError(error: FetchBaseQueryError): ApiError {
     const { code, message, details } = error.data.error;
     return { status: error.status, code, message, ...(details && { details }) };
   }
-  return {
-    status: typeof error.status === "number" ? error.status : 0,
-    code: "UNKNOWN_ERROR",
-    message: "Something went wrong. Please try again.",
-  };
+  return fromBareStatus(httpStatusOf(error));
 }
+
+// A non-JSON reply (an HTML error page from a proxy) is reported as a "parsing error" that carries
+// the real HTTP status separately.
+function httpStatusOf(error: FetchBaseQueryError): number {
+  if (typeof error.status === "number") return error.status;
+  return error.status === "PARSING_ERROR" ? error.originalStatus : 0;
+}
+
+// A reply that is not our JSON envelope came from something in between (the host, the proxy, a
+// gateway). The status still says what happened, so say that instead of a generic failure.
+function fromBareStatus(status: number): ApiError {
+  if (status === 413) {
+    return { status, code: "PAYLOAD_TOO_LARGE", message: "That file is too large to upload." };
+  }
+  if (status === 429) {
+    return { status, code: "RATE_LIMITED", message: "Too many requests. Please wait a moment." };
+  }
+  if (status === 502 || status === 503 || status === 504) {
+    return {
+      status,
+      code: "SERVICE_UNAVAILABLE",
+      message: "The server is waking up or busy. Please wait a moment and try again.",
+    };
+  }
+  return { status, code: "UNKNOWN_ERROR", message: "Something went wrong. Please try again." };
+}
+
+// Waits before re-asking a read that failed because the server was not reachable or was still
+// waking up. Only reads are repeated: repeating a write could create a second photo.
+export const READ_RETRY_DELAYS_MS: number[] = [1_500, 3_000];
+
+const isTransient = (error: FetchBaseQueryError): boolean =>
+  error.status === "FETCH_ERROR" ||
+  error.status === "TIMEOUT_ERROR" ||
+  [502, 503, 504].includes(httpStatusOf(error));
+
+const isRead = (args: string | FetchArgs): boolean =>
+  typeof args === "string" || (args.method ?? "GET").toUpperCase() === "GET";
+
+const pause = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 const baseQuery: BaseQueryFn<string | FetchArgs, unknown, ApiError> = async (args, api, extra) => {
   const url = typeof args === "string" ? args : args.url;
   const sentWith = tokenOf(api.getState());
 
   let result = await rawBaseQuery(args, api, extra);
+
+  for (const delay of READ_RETRY_DELAYS_MS) {
+    if (!result.error || !isTransient(result.error) || !isRead(args)) break;
+    await pause(delay);
+    result = await rawBaseQuery(args, api, extra);
+  }
 
   if (result.error?.status === 401 && sentWith && !NO_REFRESH_PATHS.has(url)) {
     // If another request has already swapped the token, just retry; otherwise join the shared refresh.
@@ -87,8 +132,12 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, ApiError> = async (arg
 
   if (result.error) return { error: toApiError(result.error) };
   // Every success is wrapped as { success, data }; callers only ever see the data.
-  const envelope = result.data as { data: unknown };
-  return { data: envelope.data, meta: result.meta };
+  const body: unknown = result.data;
+  if (typeof body !== "object" || body === null || !("data" in body)) {
+    // A 2xx that is not our envelope (an HTML page from a proxy, an empty body): not usable.
+    return { error: fromBareStatus(result.meta?.response?.status ?? 0) };
+  }
+  return { data: body.data, meta: result.meta };
 };
 
 export interface Credentials {
