@@ -1,8 +1,9 @@
 import type { WebStorage } from "redux-persist";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthPayload, Photo, PhotoPage } from "../lib/types";
-import { api } from "./api";
+import { api, READ_RETRY_DELAYS_MS } from "./api";
 import { credentialsReceived, emailForgotten, emailRemembered } from "./slices";
+import { REFRESH_RETRY_DELAYS_MS } from "./session";
 import { makeStore, restoreSession } from "./store";
 
 interface Call {
@@ -19,6 +20,19 @@ const fail = (status: number, code: string, message = code, details?: unknown): 
 });
 
 let calls: Call[];
+
+const originalRetryDelays = {
+  read: [...READ_RETRY_DELAYS_MS],
+  refresh: [...REFRESH_RETRY_DELAYS_MS],
+};
+beforeEach(() => {
+  READ_RETRY_DELAYS_MS.splice(0, READ_RETRY_DELAYS_MS.length, 0, 0);
+  REFRESH_RETRY_DELAYS_MS.splice(0, REFRESH_RETRY_DELAYS_MS.length, 0, 0);
+});
+afterEach(() => {
+  READ_RETRY_DELAYS_MS.splice(0, READ_RETRY_DELAYS_MS.length, ...originalRetryDelays.read);
+  REFRESH_RETRY_DELAYS_MS.splice(0, REFRESH_RETRY_DELAYS_MS.length, ...originalRetryDelays.refresh);
+});
 
 // Stands in for the network. Routes are "METHOD /path"; a route may inspect how many times it has
 // been hit, which lets a test make the first call fail and the second succeed.
@@ -292,10 +306,23 @@ describe("restoring a session after a page load", () => {
     expect(store.getState().auth.status).toBe("unavailable");
   });
 
-  it("recovers once the server is back: a retry signs in", async () => {
+  it("keeps trying while the server wakes and signs in as soon as it answers", async () => {
+    installServer({
+      "POST /auth/refresh": (n) => (n < 3 ? fail(503, "SERVICE_UNAVAILABLE") : ok(session("back"))),
+    });
+    const { store } = makeStore(memoryStorage());
+
+    const renewed = await restoreSession(store.dispatch);
+
+    expect(renewed).toBe(true);
+    expect(calls.filter((c) => c.route === "POST /auth/refresh")).toHaveLength(3);
+    expect(store.getState().auth).toMatchObject({ status: "authenticated", accessToken: "back" });
+  });
+
+  it("gives up after the retries, shows the retry panel, and a later retry can still sign in", async () => {
     installServer({
       "POST /auth/refresh": (n) =>
-        n === 1 ? fail(503, "SERVICE_UNAVAILABLE") : ok(session("back")),
+        n <= 3 ? fail(503, "SERVICE_UNAVAILABLE") : ok(session("finally")),
     });
     const { store } = makeStore(memoryStorage());
 
@@ -303,7 +330,20 @@ describe("restoring a session after a page load", () => {
     expect(store.getState().auth.status).toBe("unavailable");
     await restoreSession(store.dispatch);
 
-    expect(store.getState().auth).toMatchObject({ status: "authenticated", accessToken: "back" });
+    expect(store.getState().auth).toMatchObject({
+      status: "authenticated",
+      accessToken: "finally",
+    });
+  });
+
+  it("does not retry when the server clearly refuses the cookie", async () => {
+    installServer({ "POST /auth/refresh": () => fail(401, "INVALID_REFRESH_TOKEN") });
+    const { store } = makeStore(memoryStorage());
+
+    await restoreSession(store.dispatch);
+
+    expect(calls).toHaveLength(1);
+    expect(store.getState().auth.status).toBe("anonymous");
   });
 
   it("makes one request when called repeatedly (React strict mode runs effects twice)", async () => {
@@ -313,6 +353,115 @@ describe("restoring a session after a page load", () => {
     await Promise.all([restoreSession(store.dispatch), restoreSession(store.dispatch)]);
 
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("when the server is waking up or answers oddly", () => {
+  it("repeats a read that hit a gateway error and returns the data once it answers", async () => {
+    installServer({
+      "GET /photos": (n) =>
+        n === 1
+          ? fail(503, "SERVICE_UNAVAILABLE")
+          : ok({ items: [], page: 1, limit: 12, total: 0, totalPages: 0 }),
+    });
+    const { store } = signedIn("token-1");
+
+    const result = await store.dispatch(api.endpoints.listPhotos.initiate({ page: 1 }));
+
+    expect(result.error).toBeUndefined();
+    expect(calls.filter((c) => c.route === "GET /photos")).toHaveLength(2);
+  });
+
+  it("repeats a read that got an HTML gateway page, as a sleeping host returns", async () => {
+    let call = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() => {
+        call += 1;
+        return Promise.resolve(
+          call === 1
+            ? new Response("<html>Gateway Timeout</html>", { status: 504 })
+            : new Response(
+                JSON.stringify({
+                  success: true,
+                  data: { items: [], page: 1, limit: 12, total: 0, totalPages: 0 },
+                }),
+                { status: 200, headers: { "content-type": "application/json" } },
+              ),
+        );
+      }),
+    );
+    const { store } = signedIn("token-1");
+
+    const result = await store.dispatch(api.endpoints.listPhotos.initiate({ page: 1 }));
+
+    expect(result.error).toBeUndefined();
+    expect(call).toBe(2);
+  });
+
+  it("never repeats a write, which could create a second photo", async () => {
+    installServer({ "POST /photos": () => fail(503, "SERVICE_UNAVAILABLE") });
+    const { store } = signedIn("token-1");
+
+    const result = await store.dispatch(api.endpoints.createPhoto.initiate(new FormData()));
+
+    expect(result.error).toMatchObject({ status: 503 });
+    expect(calls.filter((c) => c.route === "POST /photos")).toHaveLength(1);
+  });
+
+  it("stops repeating a read after the configured number of retries", async () => {
+    installServer({ "GET /photos": () => fail(503, "SERVICE_UNAVAILABLE") });
+    const { store } = signedIn("token-1");
+
+    const result = await store.dispatch(api.endpoints.listPhotos.initiate({ page: 1 }));
+
+    expect(result.error).toMatchObject({ status: 503 });
+    expect(calls.filter((c) => c.route === "GET /photos")).toHaveLength(3);
+  });
+
+  it.each([
+    [504, "SERVICE_UNAVAILABLE", /waking up or busy/],
+    [502, "SERVICE_UNAVAILABLE", /waking up or busy/],
+    [413, "PAYLOAD_TOO_LARGE", /too large/],
+    [429, "RATE_LIMITED", /Too many requests/],
+    [500, "UNKNOWN_ERROR", /Something went wrong/],
+  ])(
+    "explains a bare %i from a proxy instead of a generic failure",
+    async (status, code, message) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockImplementation(() =>
+            Promise.resolve(new Response("<html>gateway</html>", { status })),
+          ),
+      );
+      const { store } = signedIn("token-1");
+
+      const result = await store.dispatch(api.endpoints.createPhoto.initiate(new FormData()));
+
+      expect(result.error).toMatchObject({ status, code });
+      expect((result.error as { message: string }).message).toMatch(message);
+    },
+  );
+
+  it("treats a 200 that is not the usual envelope as a failure instead of crashing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve(
+            new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
+          ),
+        ),
+    );
+    const { store } = signedIn("token-1");
+
+    const result = await store.dispatch(api.endpoints.listPhotos.initiate({ page: 1 }));
+
+    expect(result.error).toMatchObject({ code: "UNKNOWN_ERROR" });
+    expect(result.data).toBeUndefined();
   });
 });
 
